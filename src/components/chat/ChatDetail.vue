@@ -80,15 +80,6 @@ function formatMemberCount(count: number | null | undefined): string {
 const containerRef = ref<HTMLElement | null>(null)
 let scrollRAF = 0
 
-function tryLoadMore() {
-  const el = containerRef.value
-  if (!el || !props.chat) return
-  // If content fits viewport (no scrollbar), auto-load more
-  if (el.scrollHeight <= el.clientHeight + 100 && store.hasMore && !store.loading) {
-    store.loadMessages(props.chat.id)
-  }
-}
-
 function handleDetailScroll() {
   if (scrollRAF) return
   scrollRAF = requestAnimationFrame(() => {
@@ -99,8 +90,11 @@ function handleDetailScroll() {
     // Infinite scroll: load more messages when near bottom
     const { scrollTop, scrollHeight, clientHeight } = el
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight
-    if (distanceFromBottom < 500 && store.hasMore && !store.loading && props.chat) {
-      store.loadMessages(props.chat.id)
+    if (distanceFromBottom < 500 && !autoLoadGuard && store.hasMore && !store.loading && props.chat) {
+      autoLoadGuard = true
+      store.loadMessages(props.chat.id).then(() => {
+        autoLoadGuard = false
+      })
     }
 
     // Update URL hash with scroll position
@@ -126,11 +120,28 @@ function handleDetailScroll() {
 }
 
 // Auto-load more when content fits viewport (e.g., large screen, few media)
+// Only runs once after mount or after a manual load, NOT in a tight loop
+let autoLoadGuard = false
+
 watch(() => [store.messages.length, store.loading] as const, ([len, loading]) => {
-  if (len > 0 && !loading) {
+  if (len > 0 && !loading && !autoLoadGuard) {
+    autoLoadGuard = true
     nextTick(() => tryLoadMore())
   }
 })
+
+function tryLoadMore() {
+  const el = containerRef.value
+  if (!el || !props.chat) return
+  if (store.loading || !store.hasMore) return
+  // If content fits viewport (no scrollbar), load more
+  if (el.scrollHeight <= el.clientHeight + 100) {
+    store.loadMessages(props.chat.id).then(() => {
+      // Re-check after this load completes
+      autoLoadGuard = false
+    })
+  }
+}
 
 let detailScrollRestored = false
 

@@ -1,0 +1,315 @@
+- generic [ref=e21]:
+  - complementary [ref=e22]:
+    - generic [ref=e24]:
+      - img [ref=e25]
+      - generic [ref=e27]: Enable notifications for new messages
+      - button "Enable" [ref=e28]
+    - generic [ref=e29]:
+      - generic [ref=e30]:
+        - generic [ref=e31]: admin
+        - button "" [ref=e32]:
+          - generic [ref=e33]: 
+        - button "" [ref=e34]:
+          - generic [ref=e35]: 
+      - generic [ref=e37]:
+        - heading "Telegram Archive" [level=1] [ref=e38]
+        - button "📊 Stats" [ref=e40]:
+          - generic [ref=e41]: 📊
+          - text: Stats
+          - img [ref=e42]
+      - generic [ref=e44]:
+        - textbox "Search all chats..." [ref=e45]
+        - img [ref=e46]
+      - generic [ref=e49]:
+        - generic [ref=e53]: Real-time sync
+        - generic [ref=e54]: •
+        - generic [ref=e55]: "Last backup: Today at 01:20"
+    - generic [ref=e56]:
+      - generic [ref=e57] [cursor=pointer]:
+        - img "文件管理机器人" [ref=e59]
+        - generic [ref=e60]:
+          - generic [ref=e61]:
+            - heading "文件管理机器人" [level=3] [ref=e62]
+            - generic [ref=e63]: Today
+          - paragraph [ref=e64]: "@mxczzmxczzooBot • private • ID: 7479079265"
+      - generic [ref=e65] [cursor=pointer]:
+        - img "资源存储机器人" [ref=e67]
+        - generic [ref=e68]:
+          - generic [ref=e69]:
+            - heading "资源存储机器人" [level=3] [ref=e70]
+            - generic [ref=e71]: Today
+          - paragraph [ref=e72]: "@ziyuan33bot • private • ID: 7781181518"
+      - generic [ref=e73] [cursor=pointer]:
+        - img "云存储管家" [ref=e75]
+        - generic [ref=e76]:
+          - generic [ref=e77]:
+            - heading "云存储管家" [level=3] [ref=e78]
+            - generic [ref=e79]: Yesterday
+          - paragraph [ref=e80]: "@wiwiuusvipbot • private • ID: 8214529368"
+      - generic [ref=e81] [cursor=pointer]:
+        - generic [ref=e82]: 日
+        - generic [ref=e83]:
+          - generic [ref=e84]:
+            - heading "日本素人发送机器人" [level=3] [ref=e85]
+            - generic [ref=e86]: Yesterday
+          - paragraph [ref=e87]: "@ribenFaSongBot • private • ID: 8246339798"
+      - generic [ref=e88] [cursor=pointer]:
+        - img "文明延续【库房】" [ref=e90]
+        - generic [ref=e91]:
+          - generic [ref=e92]:
+            - heading "文明延续【库房】" [level=3] [ref=e93]
+            - generic [ref=e94]: Apr 28
+          - paragraph [ref=e95]: "@ziyuanku1hbot • private • ID: 8080158525"
+      - generic [ref=e96] [cursor=pointer]:
+        - generic [ref=e97]: 会
+        - generic [ref=e98]:
+          - generic [ref=e99]:
+            - heading "会员资源存储" [level=3] [ref=e100]
+            - generic [ref=e101]: Apr 24
+          - paragraph [ref=e102]: "@SVIPcunchubot • private • ID: 8351050535"
+      - generic [ref=e103] [cursor=pointer]:
+        - img "Alice网盘" [ref=e105]
+        - generic [ref=e106]:
+          - generic [ref=e107]:
+            - heading "Alice网盘" [level=3] [ref=e108]
+            - generic [ref=e109]: Apr 24
+          - paragraph [ref=e110]: "@alicepan_bot • private • ID: 8347301711"
+      - generic [ref=e111] [cursor=pointer]:
+        - img "存储云" [ref=e113]
+        - generic [ref=e114]:
+          - generic [ref=e115]:
+            - heading "存储云" [level=3] [ref=e116]
+            - generic [ref=e117]: Apr 24
+          - paragraph [ref=e118]: "@CunCybot • private • ID: 8203854899"
+      - generic [ref=e119] [cursor=pointer]:
+        - img [ref=e121]
+        - generic [ref=e124]:
+          - generic [ref=e125]:
+            - heading "Deleted Account" [level=3] [ref=e126]
+            - generic [ref=e127]: Apr 21
+          - paragraph [ref=e128]: "private • ID: 8048401537"
+      - generic [ref=e129] [cursor=pointer]:
+        - img "Deleted Account" [ref=e131]
+        - generic [ref=e132]:
+          - generic [ref=e133]:
+            - heading "Deleted Account" [level=3] [ref=e134]
+            - generic [ref=e135]: Apr 18
+          - paragraph [ref=e136]: "private • ID: 7851932355"
+      - generic [ref=e137] [cursor=pointer]:
+        - img "极搜🔍资源搜索@JISOU" [ref=e139]
+        - generic [ref=e140]:
+          - generic [ref=e141]:
+            - heading "极搜🔍资源搜索@JISOU" [level=3] [ref=e142]
+            - generic [ref=e143]: Apr 18
+          - paragraph [ref=e144]: "private • ID: 6175265625"
+      - generic [ref=e145] [cursor=pointer]:
+        - img "私房资源库" [ref=e147]
+        - generic [ref=e148]:
+          - generic [ref=e149]:
+            - heading "私房资源库" [level=3] [ref=e150]
+            - generic [ref=e151]: Apr 18
+          - paragraph [ref=e152]: "@wenjiancunchubot • private • ID: 7564484493"
+      - generic [ref=e153] [cursor=pointer]:
+        - img "精神小妹" [ref=e155]
+        - generic [ref=e156]:
+          - generic [ref=e157]:
+            - heading "精神小妹" [level=3] [ref=e158]
+            - generic [ref=e159]: Apr 18
+          - paragraph [ref=e160]: "@jsxm9527bot • private • ID: 8171268900"
+      - generic [ref=e161] [cursor=pointer]:
+        - img "仓宝🎗Storix™" [ref=e163]
+        - generic [ref=e164]:
+          - generic [ref=e165]:
+            - heading "仓宝🎗Storix™" [level=3] [ref=e166]
+            - generic [ref=e167]: Apr 17
+          - paragraph [ref=e168]: "@CC1555bot • private • ID: 8449574241"
+      - generic [ref=e169] [cursor=pointer]:
+        - generic [ref=e170]: 日
+        - generic [ref=e171]:
+          - generic [ref=e172]:
+            - heading "日本素人" [level=3] [ref=e173]
+            - generic [ref=e174]: Apr 13
+          - paragraph [ref=e175]: "@ribensurenbot • private • ID: 8174020888"
+      - generic [ref=e176] [cursor=pointer]:
+        - img "ID BOT" [ref=e178]
+        - generic [ref=e179]:
+          - generic [ref=e180]:
+            - heading "ID BOT" [level=3] [ref=e181]
+            - generic [ref=e182]: Apr 13
+          - paragraph [ref=e183]: "private • ID: 6907930063"
+      - generic [ref=e184] [cursor=pointer]:
+        - img "User Info • Get ID • IDbot" [ref=e186]
+        - generic [ref=e187]:
+          - generic [ref=e188]:
+            - heading "User Info • Get ID • IDbot" [level=3] [ref=e189]
+            - generic [ref=e190]: Apr 13
+          - paragraph [ref=e191]: "@userinfobot • private • ID: 52504489"
+      - generic [ref=e192] [cursor=pointer]:
+        - img "Telegram" [ref=e194]
+        - generic [ref=e195]:
+          - generic [ref=e196]:
+            - heading "Telegram" [level=3] [ref=e197]
+            - generic [ref=e198]: Apr 13
+          - paragraph [ref=e199]: "private • ID: 777000"
+      - generic [ref=e200] [cursor=pointer]:
+        - img "小七 媒体传送" [ref=e202]
+        - generic [ref=e203]:
+          - generic [ref=e204]:
+            - heading "小七 媒体传送" [level=3] [ref=e205]
+            - generic [ref=e206]: Apr 13
+          - paragraph [ref=e207]: "@ooxxooxxsoosbot • private • ID: 8038809278"
+      - generic [ref=e208] [cursor=pointer]:
+        - img "资源储存" [ref=e210]
+        - generic [ref=e211]:
+          - generic [ref=e212]:
+            - heading "资源储存" [level=3] [ref=e213]
+            - generic [ref=e214]: Apr 13
+          - paragraph [ref=e215]: "@shwenjianCbot • private • ID: 8576729140"
+      - generic [ref=e216] [cursor=pointer]:
+        - img "【丝足阁】会员助手" [ref=e218]
+        - generic [ref=e219]:
+          - generic [ref=e220]:
+            - heading "【丝足阁】会员助手" [level=3] [ref=e221]
+            - generic [ref=e222]: Apr 12
+          - paragraph [ref=e223]: "@simisebaisi03_bot • private • ID: 8077620187"
+      - generic [ref=e224] [cursor=pointer]:
+        - img "24小时自助入会机器人" [ref=e226]
+        - generic [ref=e227]:
+          - generic [ref=e228]:
+            - heading "24小时自助入会机器人" [level=3] [ref=e229]
+            - generic [ref=e230]: Apr 10
+          - paragraph [ref=e231]: "@SVIPzizhubot • private • ID: 8778301933"
+      - generic [ref=e232] [cursor=pointer]:
+        - img "瑟瑟 拉点" [ref=e234]
+        - generic [ref=e235]:
+          - generic [ref=e236]:
+            - heading "瑟瑟 拉点" [level=3] [ref=e237]
+            - generic [ref=e238]: Apr 7
+          - paragraph [ref=e239]: "@ivicv • private • ID: 6101976028"
+      - generic [ref=e240] [cursor=pointer]:
+        - img [ref=e242]
+        - generic [ref=e245]:
+          - generic [ref=e246]:
+            - heading "Deleted Account" [level=3] [ref=e247]
+            - generic [ref=e248]: Apr 7
+          - paragraph [ref=e249]: "private • ID: 7687493284"
+      - generic [ref=e250] [cursor=pointer]:
+        - img "极搜🔍资源搜索@JISOU" [ref=e252]
+        - generic [ref=e253]:
+          - generic [ref=e254]:
+            - heading "极搜🔍资源搜索@JISOU" [level=3] [ref=e255]
+            - generic [ref=e256]: Mar 24
+          - paragraph [ref=e257]: "private • ID: 5762373625"
+      - generic [ref=e258] [cursor=pointer]:
+        - img [ref=e260]
+        - generic [ref=e263]:
+          - generic [ref=e264]:
+            - heading "Deleted Account" [level=3] [ref=e265]
+            - generic [ref=e266]: Mar 22
+          - paragraph [ref=e267]: "private • ID: 8453830100"
+      - generic [ref=e268] [cursor=pointer]:
+        - generic [ref=e269]: 洪张
+        - generic [ref=e270]:
+          - generic [ref=e271]:
+            - heading "洪伟 张" [level=3] [ref=e272]
+            - generic [ref=e273]: Mar 20
+          - paragraph [ref=e274]: "private • ID: 8731046778"
+      - generic [ref=e275] [cursor=pointer]:
+        - img [ref=e277]
+        - generic [ref=e280]:
+          - generic [ref=e281]:
+            - heading "Deleted Account" [level=3] [ref=e282]
+            - generic [ref=e283]: Mar 11
+          - paragraph [ref=e284]: "private • ID: 8364406991"
+      - generic [ref=e285] [cursor=pointer]:
+        - generic [ref=e286]: M〰
+        - generic [ref=e287]:
+          - generic [ref=e288]:
+            - heading "Melisande🍭 〰️Blythe" [level=3] [ref=e289]
+            - generic [ref=e290]: Mar 10
+          - paragraph [ref=e291]: "private • ID: 8220499338"
+      - generic [ref=e292] [cursor=pointer]:
+        - img [ref=e294]
+        - generic [ref=e297]:
+          - generic [ref=e298]:
+            - heading "Deleted Account" [level=3] [ref=e299]
+            - generic [ref=e300]: Mar 1
+          - paragraph [ref=e301]: "private • ID: 8266261168"
+      - generic [ref=e302] [cursor=pointer]:
+        - img [ref=e304]
+        - generic [ref=e307]:
+          - generic [ref=e308]:
+            - heading "Deleted Account" [level=3] [ref=e309]
+            - generic [ref=e310]: Feb 27
+          - paragraph [ref=e311]: "private • ID: 8498843875"
+      - generic [ref=e312] [cursor=pointer]:
+        - img "LL网盘" [ref=e314]
+        - generic [ref=e315]:
+          - generic [ref=e316]:
+            - heading "LL网盘" [level=3] [ref=e317]
+            - generic [ref=e318]: Feb 25
+          - paragraph [ref=e319]: "@luolitawp_bot • private • ID: 8379481366"
+      - generic [ref=e322] [cursor=pointer]:
+        - generic [ref=e323]:
+          - heading "反差/人妻/母狗 福利导航" [level=3] [ref=e324]
+          - generic [ref=e325]: Feb 20
+        - paragraph [ref=e326]: "@ziyuanrrbot • private • ID: 8194297852"
+      - generic [ref=e327] [cursor=pointer]:
+        - img "开眼资源储存机器人" [ref=e329]
+        - generic [ref=e330]:
+          - generic [ref=e331]:
+            - heading "开眼资源储存机器人" [level=3] [ref=e332]
+            - generic [ref=e333]: Feb 14
+          - paragraph [ref=e334]: "@kaiyanapp1_bot • private • ID: 8568571693"
+      - generic [ref=e337] [cursor=pointer]:
+        - generic [ref=e338]:
+          - heading "群组数据记录" [level=3] [ref=e339]
+          - generic [ref=e340]: Feb 13
+        - paragraph [ref=e341]: "@jifenshopbot • private • ID: 8252399034"
+      - generic [ref=e342] [cursor=pointer]:
+        - img "FilePan网盘" [ref=e344]
+        - generic [ref=e345]:
+          - generic [ref=e346]:
+            - heading "FilePan网盘" [level=3] [ref=e347]
+            - generic [ref=e348]: Feb 13
+          - paragraph [ref=e349]: "@filepan_bot • private • ID: 6726727173"
+      - generic [ref=e350] [cursor=pointer]:
+        - img [ref=e352]
+        - generic [ref=e355]:
+          - generic [ref=e356]:
+            - heading "Deleted Account" [level=3] [ref=e357]
+            - generic [ref=e358]: Jan 28
+          - paragraph [ref=e359]: "private • ID: 6976547743"
+      - generic [ref=e360] [cursor=pointer]:
+        - img [ref=e362]
+        - generic [ref=e365]:
+          - generic [ref=e366]:
+            - heading "Deleted Account" [level=3] [ref=e367]
+            - generic [ref=e368]: Jan 16
+          - paragraph [ref=e369]: "private • ID: 8415142536"
+      - generic [ref=e370] [cursor=pointer]:
+        - img [ref=e372]
+        - generic [ref=e375]:
+          - generic [ref=e376]:
+            - heading "Deleted Account" [level=3] [ref=e377]
+            - generic [ref=e378]: Jan 14
+          - paragraph [ref=e379]: "private • ID: 8101849048"
+  - main [ref=e380]:
+    - generic [ref=e381]:
+      - generic [ref=e382]:
+        - generic [ref=e383] [cursor=pointer]:
+          - img [ref=e385]
+          - generic [ref=e386]:
+            - heading "极搜🔍资源搜索@JISOU" [level=2] [ref=e387]
+            - paragraph [ref=e388]: private
+        - generic [ref=e389]:
+          - generic "Messages" [ref=e390]: 136 msgs
+          - generic "Media files" [ref=e391]: 9 media
+          - generic "Storage" [ref=e392]: 119 MB
+      - generic [ref=e393]:
+        - generic [ref=e394]:
+          - textbox "Search..." [ref=e395]
+          - img [ref=e396]
+        - button "Export Chat" [ref=e398]:
+          - img [ref=e399]
+    - generic [ref=e1169]: Loading messages...
