@@ -159,6 +159,7 @@ function updateUrlHash() {
 }
 
 const initialScrollDone = ref(false)
+const chatReady = ref(false)
 
 // ── 3-second polling auto-refresh ──────────────────────────
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -354,11 +355,9 @@ watch(() => props.chat?.id, (newId, oldId) => {
     container.scrollTop = 0 // scrollTop=0 means bottom (flex-col-reverse)
   }
   if (newId) {
+    chatReady.value = false
     setupScrollAnchor()
     initialScrollDone.value = false
-    nextTick(() => {
-      scrollToBottom()
-    })
     startRefresh()
   } else if (oldId) {
     stopRefresh()
@@ -368,6 +367,13 @@ watch(() => props.chat?.id, (newId, oldId) => {
 watch(() => store.messages.length, (len) => {
   if (len > 0 && renderEnd.value === 0) {
     initRenderWindow()
+  }
+  if (len > 0 && !chatReady.value) {
+    nextTick(() => {
+      scrollToBottom()
+      // Slight delay ensures final scroll position before revealing
+      setTimeout(() => { chatReady.value = true }, 50)
+    })
   }
   // Restore scroll position from URL hash on initial load
   if (len > 0 && !initialScrollDone.value) {
@@ -436,6 +442,7 @@ function closePinnedView() {
     <div
       ref="messagesContainer"
       class="h-full overflow-y-auto p-4 flex flex-col-reverse gap-1 messages-scroll"
+      :class="{ 'opacity-0': !chatReady }"
       @scroll="handleScroll"
     >
       <!-- Loading -->

@@ -59,12 +59,6 @@ body,
   border-radius: 12px;
 }
 
-@media (width >= 48rem) {
-  .message-bubble {
-    max-width: 600px;
-  }
-}
-
 .message-bubble img,
 .message-bubble video,
 .message-bubble audio,

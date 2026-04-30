@@ -176,18 +176,21 @@ async function loadAppData() {
   ws.connect()
   notify.init()
 
-  // Deep link from push notification (?chat=123&msg=456)
-  const urlParams = new URLSearchParams(window.location.search)
-  const chatIdParam = urlParams.get('chat')
-  const msgIdParam = urlParams.get('msg')
+  // Deep link: parse hash (#chat=123&msg=456) or query (?chat=123&msg=456)
+  const hashParams = window.location.hash.startsWith('#')
+    ? new URLSearchParams(window.location.hash.slice(1))
+    : new URLSearchParams()
+  const queryParams = new URLSearchParams(window.location.search)
+  const chatIdParam = hashParams.get('chat') || queryParams.get('chat')
+  const msgIdParam = hashParams.get('msg') || queryParams.get('msg')
   if (chatIdParam) {
     const cid = parseInt(chatIdParam)
     const targetChat = chat.chats.find(c => c.id === cid)
     if (targetChat) {
       chat.selectedChat = targetChat
       messages.setSelectedChatId(cid)
+      // Don't clear hash — MessageList uses it for scroll restoration
     }
-    window.history.replaceState({}, '', '/')
   }
 
   // Listen for notification clicks when app is already open
