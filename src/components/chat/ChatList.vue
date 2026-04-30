@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useChatStore, getChatName } from '../../stores/chat'
 import { useMessageStore } from '../../stores/messages'
-import type { NavStateTopics, NavStateChatList } from '../../types'
+import type { NavStateTopics, NavStateChatList, Chat } from '../../types'
 import ChatItem from './ChatItem.vue'
 import LoadingSpinner from '../shared/LoadingSpinner.vue'
 
@@ -64,13 +64,15 @@ function formatDate(dateStr: string | null) {
 }
 
 // Navigate to forum topics
-async function selectChat(selected: Parameters<typeof chat.openForumTopics>[0]) {
+async function selectChat(selected: Chat) {
   if (selected.is_forum) {
     await chat.openForumTopics(selected)
     await chat.loadTopics(selected.id)
   } else {
-    // Phase 3 will handle message loading
+    chat.selectedChat = selected
     messages.setSelectedChatId(selected.id)
+    // Navigate to chat view
+    chat.navigateTo({ type: 'chat', chatId: selected.id })
   }
 }
 

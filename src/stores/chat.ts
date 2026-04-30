@@ -26,6 +26,9 @@ export const useChatStore = defineStore('chat', () => {
   const topics = ref<Topic[]>([])
   const loadingTopics = ref(false)
 
+  // ── Selected chat ──────────────────────────────────────
+  const selectedChat = ref<Chat | null>(null)
+
   // ── Navigation ──────────────────────────────────────────
   const navStack = ref<NavState[]>([{ type: 'chatList', filter: 'all' }])
 
@@ -184,6 +187,7 @@ export const useChatStore = defineStore('chat', () => {
     searchQuery, searchResults, searchLoading,
     folders, archivedCount,
     topics, loadingTopics,
+    selectedChat,
     navStack, currentNav, canGoBack, topicsNavEntry, activeTab, filteredChats,
     loadChats, searchChats, loadFolders, loadArchivedCount, loadTopics,
     navigateTo, navigateBack, navigateBackToChats, showAllChats, selectFolder, showArchived, openForumTopics,

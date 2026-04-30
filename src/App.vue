@@ -1,18 +1,41 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, watch, computed } from 'vue'
 import { useAuthStore } from './stores/auth'
 import { useChatStore } from './stores/chat'
 import { useMessageStore } from './stores/messages'
 import { useStatsStore } from './stores/stats'
+import { setDefaultTimezone } from './utils/format'
 import LoginForm from './components/auth/LoginForm.vue'
 import SidebarHeader from './components/chat/SidebarHeader.vue'
 import ChatList from './components/chat/ChatList.vue'
+import ChatHeader from './components/messages/ChatHeader.vue'
+import MessageList from './components/messages/MessageList.vue'
 import StatsPopup from './components/shared/StatsPopup.vue'
 
 const auth = useAuthStore()
 const chat = useChatStore()
 const messages = useMessageStore()
 const stats = useStatsStore()
+
+// Timezone from stats
+watch(() => stats.viewerTimezone, (tz) => {
+  if (tz) setDefaultTimezone(tz)
+})
+
+// Selected chat computed from store
+const selectedChatForView = computed(() => chat.selectedChat)
+
+const currentTopicId = computed(() => {
+  const nav = chat.currentNav
+  if (nav.type === 'chat' && nav.topicId) return nav.topicId
+  return undefined
+})
+
+const currentTopicTitle = computed(() => {
+  const nav = chat.currentNav
+  if (nav.type === 'chat' && nav.topicTitle) return nav.topicTitle
+  return undefined
+})
 
 onMounted(async () => {
   await auth.initialize()
@@ -34,6 +57,43 @@ function onLoginSuccess() {
     chat.loadArchivedCount(),
   ])
 }
+
+// Handle chat selection from ChatList
+watch(
+  () => messages.selectedChatId,
+  (chatId) => {
+    if (chatId && chat.selectedChat) {
+      messages.reset()
+      messages.loadMessages(chat.selectedChat.id, currentTopicId.value)
+      messages.loadPinnedMessages(chat.selectedChat.id)
+      messages.loadChatStats(chat.selectedChat.id)
+    }
+  }
+)
+
+function handleBackFromChat() {
+  chat.selectedChat = null
+  messages.reset()
+  messages.setSelectedChatId(null)
+  // Pop navigation if needed
+  if (chat.currentNav.type === 'chat') {
+    chat.navigateBack()
+  }
+}
+
+function handleExport() {
+  if (chat.selectedChat) {
+    window.open(`/api/chats/${chat.selectedChat.id}/export`, '_blank')
+  }
+}
+
+function handleMessageSearch(query: string) {
+  if (chat.selectedChat) {
+    messages.messageSearchQuery = query
+    messages.reset()
+    messages.loadMessages(chat.selectedChat.id, currentTopicId.value)
+  }
+}
 </script>
 
 <template>
@@ -47,7 +107,7 @@ function onLoginSuccess() {
 
   <!-- Main App Shell -->
   <div v-else class="flex w-full h-full bg-tg-bg">
-    <!-- Sidebar — hidden on mobile when chat is selected -->
+    <!-- Sidebar -->
     <aside
       class="bg-tg-sidebar flex flex-col border-r border-gray-700"
       :class="{
@@ -55,7 +115,7 @@ function onLoginSuccess() {
         'w-full md:w-1/4 md:min-w-[300px]': true,
       }"
     >
-      <!-- Database Busy Error Banner -->
+      <!-- Error Banner -->
       <div v-if="chat.chatsError" class="px-3 py-2 bg-amber-900/80 border-b border-amber-700">
         <div class="flex items-center gap-2 text-amber-200 text-sm">
           <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,11 +127,10 @@ function onLoginSuccess() {
       </div>
 
       <SidebarHeader />
-
-      <ChatList ref="chatListRef" />
+      <ChatList />
     </aside>
 
-    <!-- Main Chat Area placeholder -->
+    <!-- Main Chat Area -->
     <main
       class="flex-1 flex flex-col bg-tg-bg relative"
       :class="{
@@ -79,19 +138,28 @@ function onLoginSuccess() {
         flex: messages.selectedChatId,
       }"
     >
-      <div class="flex-1 flex items-center justify-center text-tg-muted flex-col">
-        <div class="bg-tg-sidebar p-6 rounded-full mb-4">
-          <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
-        </div>
-        <p>Select a chat to view history</p>
-      </div>
+      <ChatHeader
+        :chat="selectedChatForView"
+        :topicTitle="currentTopicTitle"
+        :chatStats="messages.chatStats"
+        :loadingStats="messages.loading"
+        :noDownload="auth.noDownload"
+        @back="handleBackFromChat"
+        @search="handleMessageSearch"
+        @export="handleExport"
+      />
+
+      <MessageList
+        v-if="selectedChatForView"
+        :chat="selectedChatForView"
+        :topicId="currentTopicId"
+        :topicTitle="currentTopicTitle"
+      />
     </main>
 
-    <!-- Stats Popup (teleported, rendered conditionally) -->
+    <!-- Stats Popup -->
     <StatsPopup
-      v-if="stats.statsPopupOpen && stats.showStatsUI"
+      v-if="stats.statsPopupOpen"
       @close="stats.statsPopupOpen = false"
     />
   </div>
