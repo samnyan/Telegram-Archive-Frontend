@@ -277,10 +277,24 @@ function getGroupedId(msg: Message): string | null {
   return gid != null ? String(gid) : null
 }
 
+// Pre-computed album map: O(n) build, O(1) lookup
+const albumMap = computed(() => {
+  const map = new Map<string, Message[]>()
+  for (const m of store.sortedMessages) {
+    const gid = getGroupedId(m)
+    if (gid) {
+      const album = map.get(gid)
+      if (album) album.push(m)
+      else map.set(gid, [m])
+    }
+  }
+  return map
+})
+
 function getAlbumFor(msg: Message): Message[] | null {
   const gid = getGroupedId(msg)
   if (!gid) return null
-  return store.sortedMessages.filter(m => getGroupedId(m) === gid)
+  return albumMap.value.get(gid) ?? null
 }
 
 function isFirstInAlbum(msg: Message, index: number): boolean {

@@ -6,11 +6,20 @@ export function useWebSocket() {
   const connected = ref(false)
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let retryCount = 0
   const handlers = new Map<string, WsMessageHandler>()
   let onConnectCallback: (() => void) | null = null
 
   function onConnect(cb: () => void) {
     onConnectCallback = cb
+  }
+
+  function scheduleReconnect() {
+    if (reconnectTimer) clearTimeout(reconnectTimer)
+    // Exponential backoff: 1s → 2s → 4s → 8s → ... → max 30s
+    const delay = Math.min(1000 * Math.pow(2, retryCount), 30000)
+    retryCount++
+    reconnectTimer = setTimeout(connect, delay)
   }
 
   function connect() {
@@ -25,6 +34,7 @@ export function useWebSocket() {
 
       ws.onopen = () => {
         connected.value = true
+        retryCount = 0 // reset on successful connection
         if (onConnectCallback) onConnectCallback()
       }
 
@@ -38,7 +48,7 @@ export function useWebSocket() {
 
       ws.onclose = () => {
         connected.value = false
-        reconnectTimer = setTimeout(connect, 5000)
+        scheduleReconnect()
       }
 
       ws.onerror = () => {

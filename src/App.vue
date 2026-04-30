@@ -159,13 +159,10 @@ const currentTopicTitle = computed(() => {
 
 // ── Chat Detail View ────────────────────────────────────────
 const showDetail = ref(false)
-const detailTab = ref<string>('video')
-const messageViewKey = ref(0)
 
 function handleOpenDetail() {
   showDetail.value = !showDetail.value
   if (showDetail.value) {
-    detailTab.value = 'video'
     const hash = `#chat=${chat.selectedChat?.id}&detail=video`
     window.history.replaceState({}, '', hash)
   } else {
@@ -175,7 +172,6 @@ function handleOpenDetail() {
 
 function handleBackFromDetail() {
   showDetail.value = false
-  messageViewKey.value++
   if (messages.selectedChatId) {
     const hash = `#chat=${messages.selectedChatId}`
     window.history.replaceState({}, '', hash)
@@ -188,6 +184,7 @@ function handleBackFromDetail() {
 // This avoids the race condition where emit('loginSuccess') fires after
 // the LoginForm is already unmounted by Vue's reactivity flush.
 const dataLoaded = ref(false)
+let swMessageHandler: ((event: MessageEvent) => void) | null = null
 
 async function loadAppData() {
   try {
@@ -224,12 +221,15 @@ async function loadAppData() {
   const detailParam = hashParams2.get('detail')
   if (detailParam && chat.selectedChat) {
     showDetail.value = true
-    detailTab.value = detailParam
   }
 
   // Listen for notification clicks when app is already open
   if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    navigator.serviceWorker.addEventListener('message', async (event) => {
+    // Remove previous handler to avoid duplicates on re-login
+    if (swMessageHandler) {
+      navigator.serviceWorker.removeEventListener('message', swMessageHandler)
+    }
+    swMessageHandler = async (event: MessageEvent) => {
       if (event.data?.type === 'NOTIFICATION_CLICK') {
         const { chat_id, message_id } = event.data.data || {}
         if (chat_id) {
@@ -240,7 +240,8 @@ async function loadAppData() {
           }
         }
       }
-    })
+    }
+    navigator.serviceWorker.addEventListener('message', swMessageHandler)
   }
 }
 
@@ -388,7 +389,6 @@ function handleMessageSearch(query: string) {
       <!-- Normal Message View -->
       <MessageList
         v-else-if="selectedChatForView"
-        :key="`${selectedChatForView.id}-${messageViewKey}`"
         :chat="selectedChatForView"
         :topicId="currentTopicId"
         :topicTitle="currentTopicTitle"

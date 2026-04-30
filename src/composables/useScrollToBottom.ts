@@ -3,11 +3,6 @@ import { ref, nextTick, type Ref } from 'vue'
 export function useScrollToBottom(containerRef: Ref<HTMLElement | null>) {
   const showScrollBtn = ref(false)
 
-  function handleScroll(event: Event) {
-    const target = event.target as HTMLElement
-    showScrollBtn.value = target.scrollTop < -300
-  }
-
   function scrollToBottom(immediate = false) {
     const el = containerRef.value
     if (!el) return
@@ -38,5 +33,5 @@ export function useScrollToBottom(containerRef: Ref<HTMLElement | null>) {
     showScrollBtn.value = false
   }
 
-  return { showScrollBtn, handleScroll, scrollToBottom, scrollToLatest }
+  return { showScrollBtn, scrollToBottom, scrollToLatest }
 }
