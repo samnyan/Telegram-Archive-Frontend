@@ -6,7 +6,6 @@ import { useChatStore, getChatName } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
 import { dateKeyInTz } from '../../utils/format'
 import { useScrollToBottom } from '../../composables/useScrollToBottom'
-import { useInfiniteScroll } from '../../composables/useInfiniteScroll'
 import MessageBubble from './MessageBubble.vue'
 import { isLightboxMedia, isLightboxImage } from '../../utils/media'
 
@@ -26,14 +25,71 @@ const chatStore = useChatStore()
 const auth = useAuthStore()
 
 const messagesContainer = ref<HTMLElement | null>(null)
-const loadMoreSentinel = ref<HTMLElement | null>(null)
 
-const { showScrollBtn, handleScroll, scrollToBottom } = useScrollToBottom(messagesContainer)
-const infiniteScroll = useInfiniteScroll(messagesContainer, loadMoreSentinel, () => {
-  if (store.hasMore && !store.loading && props.chat) {
-    store.loadMessages(props.chat.id, props.topicId)
-  }
+const { showScrollBtn, scrollToBottom } = useScrollToBottom(messagesContainer)
+
+// ── Render window (virtual scrolling) ──────────────────────
+const RENDER_SIZE = 80
+const renderStart = ref(0)
+const renderEnd = ref(0)
+
+const visibleMessages = computed(() => {
+  const end = Math.min(renderEnd.value, store.sortedMessages.length)
+  return store.sortedMessages.slice(renderStart.value, end)
 })
+
+function initRenderWindow() {
+  renderStart.value = 0
+  renderEnd.value = Math.min(RENDER_SIZE, store.sortedMessages.length)
+}
+
+function expandRenderWindow() {
+  const currentEnd = renderEnd.value
+  const total = store.sortedMessages.length
+  const newEnd = Math.min(currentEnd + RENDER_SIZE, total)
+  if (newEnd > currentEnd) {
+    renderEnd.value = newEnd
+  }
+  // Trim from start if window too large (keep max 2x RENDER_SIZE visible)
+  const windowSize = renderEnd.value - renderStart.value
+  if (windowSize > RENDER_SIZE * 2) {
+    renderStart.value = renderEnd.value - RENDER_SIZE * 2
+  }
+}
+
+// ── Scroll-based infinite scroll ───────────────────────────
+function handleScroll(event: Event) {
+  const target = event.target as HTMLElement
+  showScrollBtn.value = target.scrollTop < -300
+
+  const container = messagesContainer.value
+  if (!container) return
+  const { scrollTop, scrollHeight, clientHeight } = container
+  const distanceFromTop = scrollHeight - Math.abs(scrollTop) - clientHeight
+
+  // When near bottom, reset render window to show newest messages
+  if (Math.abs(scrollTop) <= 300 && renderStart.value > 0) {
+    const keepSize = renderEnd.value - renderStart.value
+    renderStart.value = 0
+    renderEnd.value = Math.min(keepSize, store.sortedMessages.length)
+  }
+
+  if (distanceFromTop < 1000) {
+    expandRenderWindow()
+  }
+
+  if (distanceFromTop < 500 && store.hasMore && !store.loading && props.chat) {
+    const oldScrollHeight = container.scrollHeight
+    const oldScrollTop = container.scrollTop
+    store.loadMessages(props.chat.id, props.topicId).then(() => {
+      expandRenderWindow()
+      nextTick(() => {
+        const newScrollHeight = container.scrollHeight
+        container.scrollTop = oldScrollTop - (newScrollHeight - oldScrollHeight)
+      })
+    })
+  }
+}
 
 // ── 3-second polling auto-refresh ──────────────────────────
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -78,7 +134,7 @@ async function checkForNewMessages() {
     if (newMsgs.length > 0 || deletedCount > 0) {
       await nextTick()
       const container = messagesContainer.value
-      if (container && container.scrollTop + container.clientHeight >= container.scrollHeight - 200) {
+      if (container && Math.abs(container.scrollTop) <= 200) {
         scrollToBottom()
       }
     }
@@ -201,11 +257,15 @@ function handleMediaError(event: Event) {
 function scrollToMessage(msgId: number) {
   const idx = store.sortedMessages.findIndex(m => m.id === msgId)
   if (idx === -1) return
+  if (idx < renderStart.value || idx >= renderEnd.value) {
+    renderStart.value = Math.max(0, idx - Math.floor(RENDER_SIZE / 2))
+    renderEnd.value = Math.min(store.sortedMessages.length, idx + Math.ceil(RENDER_SIZE / 2))
+  }
   nextTick(() => {
     const container = messagesContainer.value
     if (!container) return
     const bubbles = container.querySelectorAll('.message-bubble')
-    const el = bubbles[idx % bubbles.length]
+    const el = bubbles[idx - renderStart.value]
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       ;(el as HTMLElement).style.backgroundColor = '#1e40af'
@@ -225,11 +285,16 @@ watch(() => props.chat?.id, (newId, oldId) => {
   if (newId) {
     nextTick(() => {
       scrollToBottom()
-      infiniteScroll.setup()
     })
     startRefresh()
   } else if (oldId) {
     stopRefresh()
+  }
+})
+
+watch(() => store.messages.length, (len) => {
+  if (len > 0 && renderEnd.value === 0) {
+    initRenderWindow()
   }
 })
 
@@ -282,16 +347,16 @@ function closePinnedView() {
       </div>
 
       <!-- Messages loop -->
-      <template v-for="(msg, index) in store.sortedMessages" :key="msg.id">
+      <template v-for="(msg, index) in visibleMessages" :key="msg.id">
         <MessageBubble
           :message="msg"
-          :index="index"
+          :index="index + renderStart"
           :chat="chat"
           :album="getAlbumFor(msg)"
-          :isFirstInAlbum="isFirstInAlbum(msg, index)"
-          :isHiddenAlbum="isHiddenAlbumMsg(msg, index)"
-          :showDateSep="showDateSep(index)"
-          :showSender="showSenderName(index)"
+          :isFirstInAlbum="isFirstInAlbum(msg, index + renderStart)"
+          :isHiddenAlbum="isHiddenAlbumMsg(msg, index + renderStart)"
+          :showDateSep="showDateSep(index + renderStart)"
+          :showSender="showSenderName(index + renderStart)"
           :noDownload="auth.noDownload"
           @replyClick="scrollToMessage"
           @openMedia="openMedia"
@@ -306,8 +371,8 @@ function closePinnedView() {
         <div class="loading-spinner" />
       </div>
 
-      <!-- Scroll sentinel -->
-      <div v-if="store.hasMore && !store.loading && store.messages.length > 0" ref="loadMoreSentinel" class="h-1" />
+      <!-- Load more indicator -->
+      <div v-if="store.hasMore && !store.loading && store.messages.length > 0" class="h-1" />
 
       <!-- End of history -->
       <div v-if="!store.hasMore && store.messages.length > 0" class="text-center py-3 text-tg-muted text-xs opacity-50">
