@@ -65,10 +65,9 @@ function albumPhotos(): Message[] {
       />
       <video
         v-else-if="albumMsg.media?.type === 'video'"
-        class="w-full h-full object-cover" preload="metadata"
-      >
-        <source :src="getMediaUrl(albumMsg)" type="video/mp4" />
-      </video>
+        class="w-full h-full object-cover lazy-video"
+        :data-src="getMediaUrl(albumMsg)"
+      />
       <div v-if="albumMsg.media?.type === 'video'" class="absolute inset-0 flex items-center justify-center bg-black/20">
         <svg class="w-10 h-10 text-white/90" fill="currentColor" viewBox="0 0 24 24">
           <path d="M8 5v14l11-7z" />
@@ -102,7 +101,7 @@ function albumPhotos(): Message[] {
   <video
     v-else-if="message.media?.type === 'animation'"
     :data-src="getMediaUrl(message)"
-    class="rounded-lg max-h-64 w-auto max-w-full gif-video" loop muted playsinline
+    class="rounded-lg max-h-64 w-auto max-w-full gif-video lazy-video" loop muted playsinline
     @click="emit('openMedia', message)"
   />
 
@@ -111,9 +110,11 @@ function albumPhotos(): Message[] {
     v-else-if="message.media?.type === 'video'"
     class="relative cursor-pointer group" @click="emit('openMedia', message)"
   >
-    <video preload="metadata" class="rounded-lg max-h-64 w-full pointer-events-none" @error="emit('mediaError', $event, message)">
-      <source :src="getMediaUrl(message)" type="video/mp4" />
-    </video>
+    <video
+      class="rounded-lg max-h-64 w-full pointer-events-none lazy-video"
+      :data-src="getMediaUrl(message)"
+      @error="emit('mediaError', $event, message)"
+    />
     <div class="absolute inset-0 flex items-center justify-center bg-black/20 group-hover:bg-black/40 transition rounded-lg">
       <div class="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center shadow-lg">
         <svg class="w-8 h-8 text-gray-800 ml-1" fill="currentColor" viewBox="0 0 24 24">

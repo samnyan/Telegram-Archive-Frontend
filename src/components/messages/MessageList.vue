@@ -141,18 +141,23 @@ function handleScroll(event: Event) {
 function updateUrlHash() {
   const container = messagesContainer.value
   if (!container || !props.chat) return
-  // Find the message closest to the top of the viewport
+  // Find the message closest to the bottom of the viewport (where user reads)
   const bubbles = container.querySelectorAll('.message-bubble')
-  let topMsgId: number | null = null
+  let bottomMsgId: number | null = null
+  const containerRect = container.getBoundingClientRect()
+  const bottomEdge = containerRect.bottom
+
   for (const bubble of bubbles) {
     const rect = bubble.getBoundingClientRect()
-    const containerRect = container.getBoundingClientRect()
-    if (rect.bottom > containerRect.top + 50) {
-      topMsgId = Number((bubble as HTMLElement).dataset.msgId)
-      break
+    // Find the message that intersects the bottom ~30% of the viewport
+    if (rect.bottom > bottomEdge - containerRect.height * 0.3 && rect.top < bottomEdge) {
+      const msgId = Number((bubble as HTMLElement).dataset.msgId)
+      if (msgId) bottomMsgId = msgId
+      // Keep going — we want the LAST matching message (closest to bottom)
     }
   }
-  const hash = `#chat=${props.chat.id}${topMsgId ? `&msg=${topMsgId}` : ''}`
+
+  const hash = `#chat=${props.chat.id}${bottomMsgId ? `&msg=${bottomMsgId}` : ''}`
   if (window.location.hash !== hash) {
     window.history.replaceState({}, '', hash)
   }
@@ -225,32 +230,42 @@ function stopRefresh() {
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
 }
 
-// ── GIF Autoplay (IntersectionObserver) ────────────────────
-let gifObserver: IntersectionObserver | null = null
+// ── Lazy Video Observer (IntersectionObserver) ─────────────
+let lazyVideoObserver: IntersectionObserver | null = null
 
-function setupGifObserver() {
-  if (gifObserver) gifObserver.disconnect()
-  gifObserver = new IntersectionObserver((entries) => {
+function setupLazyVideoObserver() {
+  if (lazyVideoObserver) lazyVideoObserver.disconnect()
+  lazyVideoObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       const video = entry.target as HTMLVideoElement
       if (entry.isIntersecting) {
-        if (!video.src && video.dataset.src) video.src = video.dataset.src
-        video.play().catch(() => {})
+        // Load video source if not yet loaded
+        if (!video.src && video.dataset.src) {
+          video.src = video.dataset.src
+        }
+        // Autoplay GIFs
+        if (video.classList.contains('gif-video')) {
+          video.play().catch(() => {})
+        }
       } else {
-        video.pause()
+        // Pause GIFs when out of viewport (regular videos stay loaded)
+        if (video.classList.contains('gif-video')) {
+          video.pause()
+        }
       }
     })
   }, { threshold: 0.1 })
 }
 
-function observeGifs() {
+function observeLazyVideos() {
   nextTick(() => {
-    if (!gifObserver) setupGifObserver()
-    document.querySelectorAll('.gif-video').forEach(v => gifObserver?.observe(v))
+    if (!lazyVideoObserver) setupLazyVideoObserver()
+    document.querySelectorAll('.lazy-video').forEach(v => lazyVideoObserver?.observe(v))
   })
 }
 
-watch(() => store.messages.length, observeGifs, { deep: false })
+// Watch messages.length changes to re-observe new lazy videos
+watch(() => store.messages.length, observeLazyVideos, { deep: false })
 
 // ── Album grouping ────────────────────────────────────────
 function getGroupedId(msg: Message): string | null {
@@ -346,6 +361,28 @@ function scrollToMessage(msgId: number) {
   })
 }
 
+// ── Scroll position restoration ──────────────────────────
+async function restorePosition(hashMsgId: number) {
+  // Check if target message exists in loaded messages
+  let idx = store.sortedMessages.findIndex(m => m.id === hashMsgId)
+
+  // Keep loading older messages until we find the target or run out
+  while (idx === -1 && store.hasMore && props.chat) {
+    await store.loadMessages(props.chat.id, props.topicId)
+    idx = store.sortedMessages.findIndex(m => m.id === hashMsgId)
+  }
+
+  if (idx >= 0) {
+    renderStart.value = Math.max(0, idx - Math.floor(RENDER_SIZE / 2))
+    renderEnd.value = Math.min(store.sortedMessages.length, idx + Math.ceil(RENDER_SIZE / 2))
+    nextTick(() => {
+      const el = messagesContainer.value?.querySelector(`[data-msg-id="${hashMsgId}"]`)
+      if (el) el.scrollIntoView({ block: 'center' })
+    })
+  }
+  return idx >= 0
+}
+
 // ── Load messages when chat changes ──────────────────────
 // NOTE: Data loading (reset + loadMessages) is handled by App.vue's watcher on
 // selectedChatId. This watcher only handles UI lifecycle: polling, scroll, infinite scroll.
@@ -382,15 +419,7 @@ watch(() => store.messages.length, (len) => {
     const hashMsgId = hashParams.get('msg')
     if (hashMsgId) {
       const msgId = parseInt(hashMsgId)
-      const idx = store.sortedMessages.findIndex(m => m.id === msgId)
-      if (idx >= 0) {
-        renderStart.value = Math.max(0, idx - Math.floor(RENDER_SIZE / 2))
-        renderEnd.value = Math.min(store.sortedMessages.length, idx + Math.ceil(RENDER_SIZE / 2))
-        nextTick(() => {
-          const el = messagesContainer.value?.querySelector(`[data-msg-id="${msgId}"]`)
-          if (el) el.scrollIntoView({ block: 'center' })
-        })
-      }
+      restorePosition(msgId)
     }
   }
 })
@@ -399,6 +428,7 @@ onUnmounted(() => {
   teardownScrollAnchor()
   stopRefresh()
   if (scrollRAF) cancelAnimationFrame(scrollRAF)
+  if (lazyVideoObserver) lazyVideoObserver.disconnect()
 })
 
 // ── Pinned message banner ────────────────────────────────
