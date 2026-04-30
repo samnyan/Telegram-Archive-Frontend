@@ -272,7 +272,8 @@ function handleBackFromChat() {
   messages.reset()
   messages.setSelectedChatId(null)
   showDetail.value = false
-  if (chat.currentNav.type === 'chat') chat.navigateBack()
+  // Explicitly reload chat list so it's not blank
+  chat.loadChats()
 }
 
 function handleExport() {
@@ -366,7 +367,9 @@ function handleMessageSearch(query: string) {
         :chatStats="messages.chatStats"
         :loadingStats="messages.loading"
         :noDownload="auth.noDownload"
+        :inDetail="showDetail"
         @back="handleBackFromChat"
+        @closeDetail="handleBackFromDetail"
         @search="handleMessageSearch"
         @export="handleExport"
         @openDetail="handleOpenDetail"

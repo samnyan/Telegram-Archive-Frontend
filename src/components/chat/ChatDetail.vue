@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import type { Chat, Message } from '../../types'
 import { useMessageStore } from '../../stores/messages'
 import { getChatName } from '../../stores/chat'
@@ -76,20 +76,68 @@ function formatMemberCount(count: number | null | undefined): string {
   if (!count) return ''
   return count >= 1000 ? `${(count / 1000).toFixed(1)}k members` : `${count} members`
 }
+
+const containerRef = ref<HTMLElement | null>(null)
+let scrollRAF = 0
+
+function handleDetailScroll() {
+  if (scrollRAF) return
+  scrollRAF = requestAnimationFrame(() => {
+    scrollRAF = 0
+    const el = containerRef.value
+    if (!el) return
+
+    // Infinite scroll: load more messages when near bottom
+    const { scrollTop, scrollHeight, clientHeight } = el
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight
+    if (distanceFromBottom < 500 && store.hasMore && !store.loading && props.chat) {
+      store.loadMessages(props.chat.id)
+    }
+
+    // Update URL hash with scroll position
+    const items = el.querySelectorAll('.media-grid-item')
+    let topMsgId: number | null = null
+    const containerTop = el.getBoundingClientRect().top
+    for (const item of items) {
+      const rect = item.getBoundingClientRect()
+      // Find first item that's at least partially in viewport
+      if (rect.bottom > containerTop + 50) {
+        // Try to find data attribute
+        const msgEl = item.querySelector('[data-msg-id]') || item
+        const msgId = (msgEl as HTMLElement).dataset?.msgId
+        if (msgId) { topMsgId = Number(msgId); break }
+      }
+    }
+
+    const hash = `#chat=${props.chat.id}&detail=${activeTab.value}${topMsgId ? `&msg=${topMsgId}` : ''}`
+    if (window.location.hash !== hash) {
+      window.history.replaceState({}, '', hash)
+    }
+  })
+}
+
+onMounted(() => {
+  // Restore scroll position from hash
+  const hashParams = new URLSearchParams(window.location.hash.slice(1))
+  const hashMsgId = hashParams.get('msg')
+  if (hashMsgId) {
+    const msgId = parseInt(hashMsgId)
+    // Check if this message is in our loaded set
+    const idx = store.sortedMessages.findIndex(m => m.id === msgId)
+    if (idx >= 0) {
+      nextTick(() => {
+        const el = containerRef.value?.querySelector(`[data-msg-id="${msgId}"]`)
+        if (el) el.scrollIntoView({ block: 'start' })
+      })
+    }
+  }
+})
+
+onUnmounted(() => { if (scrollRAF) cancelAnimationFrame(scrollRAF) })
 </script>
 
 <template>
-  <div class="flex-1 flex flex-col min-h-0 bg-tg-bg overflow-y-auto">
-    <!-- Back button -->
-    <div class="px-3 py-2 flex items-center gap-2 border-b border-gray-700/50 bg-tg-sidebar sticky top-0 z-20">
-      <button @click="emit('back')" class="p-1.5 hover:bg-gray-700 rounded-full transition text-gray-400 hover:text-white">
-        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-        </svg>
-      </button>
-      <span class="text-sm font-medium text-white">Chat Info</span>
-    </div>
-
+  <div ref="containerRef" @scroll="handleDetailScroll" class="flex-1 flex flex-col min-h-0 bg-tg-bg overflow-y-auto">
     <!-- Chat Info Header -->
     <div class="px-4 py-6 flex flex-col items-center gap-3 border-b border-gray-700/50 text-center">
       <!-- Avatar (larger) -->

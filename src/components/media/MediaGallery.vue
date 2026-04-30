@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { Message } from '../../types'
 import { getMediaUrl } from '../../utils/media'
 import { isLightboxMedia } from '../../utils/media'
@@ -40,6 +40,29 @@ function formatFileSize(msg: Message): string {
   const name = msg.media?.file_name || ''
   return name
 }
+
+let galleryVideoObserver: IntersectionObserver | null = null
+
+function setupGalleryObserver() {
+  if (galleryVideoObserver) galleryVideoObserver.disconnect()
+  galleryVideoObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const video = entry.target as HTMLVideoElement
+      if (entry.isIntersecting) {
+        if (!video.src && video.dataset.src) video.src = video.dataset.src
+      }
+    })
+  }, { threshold: 0.1 })
+  nextTick(() => {
+    document.querySelectorAll('.media-grid-item .lazy-video').forEach(v => galleryVideoObserver?.observe(v))
+  })
+}
+
+onMounted(setupGalleryObserver)
+onUnmounted(() => galleryVideoObserver?.disconnect())
+
+// Re-observe when messages change
+watch(() => props.messages.length, () => nextTick(setupGalleryObserver))
 </script>
 
 <template>
@@ -56,12 +79,14 @@ function formatFileSize(msg: Message): string {
         v-for="(msg, index) in messages" :key="msg.id"
         class="media-grid-item"
         :class="{ 'is-voice': isVoiceType() }"
+        :data-msg-id="msg.id"
         @click="isLightboxCompatible(msg) ? emit('openLightbox', msg, index) : null"
       >
         <!-- Image / Video thumbnail -->
         <template v-if="!isVoiceType()">
+          <!-- Image thumbnail -->
           <img
-            v-if="msg.media?.type === 'photo' || msg.media?.type === 'video' || msg.media?.type === 'animation'"
+            v-if="msg.media?.type === 'photo'"
             :src="thumbnailUrl(msg)"
             loading="lazy"
             class="w-full h-full object-cover"
@@ -70,10 +95,20 @@ function formatFileSize(msg: Message): string {
               img.src = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22><rect fill=%22%23374151%22 width=%22200%22 height=%22200%22/></svg>')
             }"
           />
+
+          <!-- Video thumbnail (use video tag, not img) -->
+          <video
+            v-else-if="msg.media?.type === 'video' || msg.media?.type === 'animation'"
+            :data-src="thumbnailUrl(msg)"
+            class="w-full h-full object-cover lazy-video"
+            muted
+          />
+
           <!-- Document thumbnail fallback -->
           <div v-else class="w-full h-full bg-gray-800 flex items-center justify-center">
             <span class="text-2xl opacity-50">{{ mediaIcon(msg) }}</span>
           </div>
+
           <!-- Play icon overlay for videos -->
           <div v-if="msg.media?.type === 'video' || msg.media?.type === 'animation'" class="media-play-overlay">
             <div class="w-8 h-8 bg-white/80 rounded-full flex items-center justify-center">

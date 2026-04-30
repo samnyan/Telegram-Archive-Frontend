@@ -11,10 +11,12 @@ const props = defineProps<{
   chatStats: ChatStats | null
   loadingStats: boolean
   noDownload: boolean
+  inDetail?: boolean
 }>()
 
 const emit = defineEmits<{
   back: []
+  closeDetail: []
   search: [query: string]
   export: []
   openDetail: []
@@ -43,15 +45,26 @@ function avatarOf(chat: Chat) {
     class="px-2 sm:px-4 py-2 sm:py-3 bg-tg-sidebar border-b border-gray-700 flex items-center justify-between shadow-md z-10"
   >
     <div class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
-      <!-- Back Button (mobile) -->
-      <button @click="emit('back')" class="md:hidden p-2 -ml-2 text-gray-400 hover:text-white">
+      <!-- Detail view: close/back button (always visible) -->
+      <button v-if="inDetail" @click="emit('closeDetail')" class="p-2 -ml-2 text-gray-400 hover:text-white">
         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
         </svg>
       </button>
 
-      <!-- Avatar + Name (clickable → opens detail) -->
-      <div @click="emit('openDetail')" class="flex items-center gap-2 sm:gap-3 cursor-pointer hover:opacity-80 transition min-w-0 flex-1">
+      <!-- Mobile back button (only when NOT in detail) -->
+      <button v-else @click="emit('back')" class="md:hidden p-2 -ml-2 text-gray-400 hover:text-white">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+
+      <!-- Avatar + Name (clickable → opens detail, but not in detail mode) -->
+      <div
+        @click="inDetail ? null : emit('openDetail')"
+        :class="inDetail ? '' : 'cursor-pointer hover:opacity-80 transition'"
+        class="flex items-center gap-2 sm:gap-3 min-w-0 flex-1"
+      >
         <div class="w-10 h-10 min-w-[2.5rem] aspect-square rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-white overflow-hidden shrink-0">
           <img
             v-if="chat.avatar_url" :src="chat.avatar_url" class="w-full h-full object-cover"

@@ -479,10 +479,18 @@ function closePinnedView() {
 
     <div
       ref="messagesContainer"
-      class="h-full overflow-y-auto p-4 flex flex-col-reverse gap-1 messages-scroll"
+      class="h-full overflow-y-auto p-4 flex flex-col-reverse gap-1 messages-scroll relative"
       :class="{ 'opacity-0': !chatReady }"
       @scroll="handleScroll"
     >
+      <!-- Loading overlay shown during chatReady=false -->
+      <div v-if="!chatReady" class="absolute inset-0 flex items-center justify-center bg-tg-bg z-10">
+        <div class="flex flex-col items-center gap-3">
+          <div class="loading-spinner" />
+          <span class="text-sm text-tg-muted">Loading messages...</span>
+        </div>
+      </div>
+
       <!-- Loading -->
       <div v-if="store.loading && store.messages.length === 0" class="text-center py-4 text-tg-muted">
         Loading messages...
