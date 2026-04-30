@@ -57,39 +57,108 @@ function expandRenderWindow() {
   }
 }
 
-// ── Scroll-based infinite scroll ───────────────────────────
+// ── ResizeObserver-based scroll anchoring ──────────────────
+let scrollAnchorObserver: ResizeObserver | null = null
+let anchorLastHeight = 0
+
+function setupScrollAnchor() {
+  if (scrollAnchorObserver) scrollAnchorObserver.disconnect()
+  const el = messagesContainer.value
+  if (!el) return
+  anchorLastHeight = el.scrollHeight
+  scrollAnchorObserver = new ResizeObserver(() => {
+    const newHeight = el.scrollHeight
+    if (newHeight !== anchorLastHeight && anchorLastHeight !== 0) {
+      const delta = newHeight - anchorLastHeight
+      // flex-col-reverse: when content grows above (older msgs),
+      // shift scrollTop by -delta to keep same visual position
+      el.scrollTop -= delta
+      // Clamp to valid range (safety net)
+      const minTop = -(el.scrollHeight - el.clientHeight)
+      if (el.scrollTop < minTop) el.scrollTop = minTop
+    }
+    anchorLastHeight = newHeight
+  })
+  scrollAnchorObserver.observe(el)
+}
+
+function teardownScrollAnchor() {
+  if (scrollAnchorObserver) {
+    scrollAnchorObserver.disconnect()
+    scrollAnchorObserver = null
+    anchorLastHeight = 0
+  }
+}
+
+// ── Scroll RAF throttle ────────────────────────────────────
+let scrollRAF = 0
+const isAdjustingScroll = ref(false)
+
 function handleScroll(event: Event) {
   const target = event.target as HTMLElement
   showScrollBtn.value = target.scrollTop < -300
 
-  const container = messagesContainer.value
-  if (!container) return
-  const { scrollTop, scrollHeight, clientHeight } = container
-  const distanceFromTop = scrollHeight - Math.abs(scrollTop) - clientHeight
+  if (scrollRAF) return
+  scrollRAF = requestAnimationFrame(() => {
+    scrollRAF = 0
 
-  // When near bottom, reset render window to show newest messages
-  if (Math.abs(scrollTop) <= 300 && renderStart.value > 0) {
-    const keepSize = renderEnd.value - renderStart.value
-    renderStart.value = 0
-    renderEnd.value = Math.min(keepSize, store.sortedMessages.length)
-  }
+    const container = messagesContainer.value
+    if (!container) return
+    const { scrollTop, scrollHeight, clientHeight } = container
+    const distanceFromTop = scrollHeight - Math.abs(scrollTop) - clientHeight
 
-  if (distanceFromTop < 1000) {
-    expandRenderWindow()
-  }
+    // When near bottom, reset render window to show newest messages
+    if (Math.abs(scrollTop) <= 300 && renderStart.value > 0) {
+      const keepSize = renderEnd.value - renderStart.value
+      renderStart.value = 0
+      renderEnd.value = Math.min(keepSize, store.sortedMessages.length)
+    }
 
-  if (distanceFromTop < 500 && store.hasMore && !store.loading && props.chat) {
-    const oldScrollHeight = container.scrollHeight
-    const oldScrollTop = container.scrollTop
-    store.loadMessages(props.chat.id, props.topicId).then(() => {
+    if (distanceFromTop < 1000) {
       expandRenderWindow()
-      nextTick(() => {
-        const newScrollHeight = container.scrollHeight
-        container.scrollTop = oldScrollTop - (newScrollHeight - oldScrollHeight)
+    }
+
+    if (distanceFromTop < 500 && store.hasMore && !store.loading && !isAdjustingScroll.value && props.chat) {
+      isAdjustingScroll.value = true
+      const chatIdAtCall = props.chat.id
+      const prevScrollHeight = container.scrollHeight
+      store.loadMessages(props.chat.id, props.topicId).then(() => {
+        if (props.chat?.id !== chatIdAtCall) return
+        expandRenderWindow()
+        // ResizeObserver handles anchoring
+        // Clear flag after browser processes everything
+        requestAnimationFrame(() => {
+          isAdjustingScroll.value = false
+        })
       })
-    })
+    }
+
+    updateUrlHash()
+  })
+}
+
+// ── URL hash persistence ───────────────────────────────────
+function updateUrlHash() {
+  const container = messagesContainer.value
+  if (!container || !props.chat) return
+  // Find the message closest to the top of the viewport
+  const bubbles = container.querySelectorAll('.message-bubble')
+  let topMsgId: number | null = null
+  for (const bubble of bubbles) {
+    const rect = bubble.getBoundingClientRect()
+    const containerRect = container.getBoundingClientRect()
+    if (rect.bottom > containerRect.top + 50) {
+      topMsgId = Number((bubble as HTMLElement).dataset.msgId)
+      break
+    }
+  }
+  const hash = `#chat=${props.chat.id}${topMsgId ? `&msg=${topMsgId}` : ''}`
+  if (window.location.hash !== hash) {
+    window.history.replaceState({}, '', hash)
   }
 }
+
+const initialScrollDone = ref(false)
 
 // ── 3-second polling auto-refresh ──────────────────────────
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -97,12 +166,16 @@ let isRefreshing = false
 
 async function checkForNewMessages() {
   if (!props.chat || isRefreshing || store.loading) return
+  const chatIdAtStart = props.chat.id
+  const topicIdAtStart = props.topicId
   isRefreshing = true
   try {
-    const url = `/api/chats/${props.chat.id}/messages?limit=50&offset=0` +
-      (props.topicId ? `&topic_id=${props.topicId}` : '')
+    const url = `/api/chats/${chatIdAtStart}/messages?limit=50&offset=0` +
+      (topicIdAtStart ? `&topic_id=${topicIdAtStart}` : '')
     const res = await fetch(url, { credentials: 'include' })
     if (!res.ok) return
+    // Discard if chat or topic changed during fetch
+    if (props.chat?.id !== chatIdAtStart || props.topicId !== topicIdAtStart) return
 
     const latestMessages: Message[] = await res.json()
     const latestIds = new Set(latestMessages.map(m => m.id))
@@ -150,8 +223,6 @@ function startRefresh() {
 function stopRefresh() {
   if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
 }
-
-onUnmounted(stopRefresh)
 
 // ── GIF Autoplay (IntersectionObserver) ────────────────────
 let gifObserver: IntersectionObserver | null = null
@@ -283,6 +354,8 @@ watch(() => props.chat?.id, (newId, oldId) => {
     container.scrollTop = 0 // scrollTop=0 means bottom (flex-col-reverse)
   }
   if (newId) {
+    setupScrollAnchor()
+    initialScrollDone.value = false
     nextTick(() => {
       scrollToBottom()
     })
@@ -296,6 +369,30 @@ watch(() => store.messages.length, (len) => {
   if (len > 0 && renderEnd.value === 0) {
     initRenderWindow()
   }
+  // Restore scroll position from URL hash on initial load
+  if (len > 0 && !initialScrollDone.value) {
+    initialScrollDone.value = true
+    const hashParams = new URLSearchParams(window.location.hash.slice(1))
+    const hashMsgId = hashParams.get('msg')
+    if (hashMsgId) {
+      const msgId = parseInt(hashMsgId)
+      const idx = store.sortedMessages.findIndex(m => m.id === msgId)
+      if (idx >= 0) {
+        renderStart.value = Math.max(0, idx - Math.floor(RENDER_SIZE / 2))
+        renderEnd.value = Math.min(store.sortedMessages.length, idx + Math.ceil(RENDER_SIZE / 2))
+        nextTick(() => {
+          const el = messagesContainer.value?.querySelector(`[data-msg-id="${msgId}"]`)
+          if (el) el.scrollIntoView({ block: 'center' })
+        })
+      }
+    }
+  }
+})
+
+onUnmounted(() => {
+  teardownScrollAnchor()
+  stopRefresh()
+  if (scrollRAF) cancelAnimationFrame(scrollRAF)
 })
 
 // ── Pinned message banner ────────────────────────────────
@@ -348,22 +445,24 @@ function closePinnedView() {
 
       <!-- Messages loop -->
       <template v-for="(msg, index) in visibleMessages" :key="msg.id">
-        <MessageBubble
-          :message="msg"
-          :index="index + renderStart"
-          :chat="chat"
-          :album="getAlbumFor(msg)"
-          :isFirstInAlbum="isFirstInAlbum(msg, index + renderStart)"
-          :isHiddenAlbum="isHiddenAlbumMsg(msg, index + renderStart)"
-          :showDateSep="showDateSep(index + renderStart)"
-          :showSender="showSenderName(index + renderStart)"
-          :noDownload="auth.noDownload"
-          @replyClick="scrollToMessage"
-          @openMedia="openMedia"
-          @imageError="handleImageError"
-          @mediaError="handleMediaError"
-          @jumpToDate="emit('openDatePicker', $event)"
-        />
+        <div class="message-bubble" :data-msg-id="msg.id">
+          <MessageBubble
+            :message="msg"
+            :index="index + renderStart"
+            :chat="chat"
+            :album="getAlbumFor(msg)"
+            :isFirstInAlbum="isFirstInAlbum(msg, index + renderStart)"
+            :isHiddenAlbum="isHiddenAlbumMsg(msg, index + renderStart)"
+            :showDateSep="showDateSep(index + renderStart)"
+            :showSender="showSenderName(index + renderStart)"
+            :noDownload="auth.noDownload"
+            @replyClick="scrollToMessage"
+            @openMedia="openMedia"
+            @imageError="handleImageError"
+            @mediaError="handleMediaError"
+            @jumpToDate="emit('openDatePicker', $event)"
+          />
+        </div>
       </template>
 
       <!-- Loading older messages -->
