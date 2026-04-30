@@ -174,6 +174,8 @@ let isRefreshing = false
 
 async function checkForNewMessages() {
   if (!props.chat || isRefreshing || store.loading) return
+  // Skip polling when in search mode — results would bypass the filter
+  if (store.messageSearchQuery) return
   const chatIdAtStart = props.chat.id
   const topicIdAtStart = props.topicId
   isRefreshing = true
@@ -365,12 +367,20 @@ function scrollToMessage(msgId: number) {
 
 // ── Scroll position restoration ──────────────────────────
 async function restorePosition(hashMsgId: number) {
+  // Capture chat at start to guard against chat switch
+  const chatIdAtStart = props.chat?.id
+  const topicIdAtStart = props.topicId
   // Check if target message exists in loaded messages
   let idx = store.sortedMessages.findIndex(m => m.id === hashMsgId)
 
   // Keep loading older messages until we find the target or run out
-  while (idx === -1 && store.hasMore && props.chat) {
-    await store.loadMessages(props.chat.id, props.topicId)
+  while (idx === -1 && store.hasMore && props.chat?.id === chatIdAtStart) {
+    if (store.loading) {
+      await new Promise(r => setTimeout(r, 100))
+      idx = store.sortedMessages.findIndex(m => m.id === hashMsgId)
+      continue
+    }
+    await store.loadMessages(chatIdAtStart!, topicIdAtStart)
     idx = store.sortedMessages.findIndex(m => m.id === hashMsgId)
   }
 

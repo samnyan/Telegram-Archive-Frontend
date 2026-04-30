@@ -190,7 +190,6 @@ function handleBackFromDetail() {
 const dataLoaded = ref(false)
 
 async function loadAppData() {
-  dataLoaded.value = true
   try {
     await Promise.all([
       chat.loadChats(),
@@ -199,6 +198,7 @@ async function loadAppData() {
       chat.loadArchivedCount(),
     ])
   } catch { /* errors handled per-store */ }
+  dataLoaded.value = true
   ws.connect()
   notify.init()
 
@@ -286,8 +286,8 @@ function handleExport() {
 
 function handleMessageSearch(query: string) {
   if (chat.selectedChat) {
-    messages.messageSearchQuery = query
     messages.reset()
+    messages.messageSearchQuery = query
     messages.loadMessages(chat.selectedChat.id, currentTopicId.value)
   }
 }

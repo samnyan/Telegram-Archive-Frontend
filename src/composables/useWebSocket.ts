@@ -14,6 +14,7 @@ export function useWebSocket() {
   }
 
   function connect() {
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
     if (ws) ws.close()
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'

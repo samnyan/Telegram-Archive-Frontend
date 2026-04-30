@@ -20,9 +20,9 @@ const emit = defineEmits<{
 const store = useMessageStore()
 
 type MediaTab = 'video' | 'image' | 'voice' | 'files'
-const activeTab = ref<MediaTab>(
-  (new URLSearchParams(window.location.hash.slice(1)).get('detail') as MediaTab) || 'video'
-)
+const validTabs: MediaTab[] = ['video', 'image', 'voice', 'files']
+const hashTab = new URLSearchParams(window.location.hash.slice(1)).get('detail') as MediaTab
+const activeTab = ref<MediaTab>(validTabs.includes(hashTab) ? hashTab : 'video')
 
 const tabs: { key: MediaTab; label: string; icon: string }[] = [
   { key: 'video', label: 'Video', icon: '▶' },
@@ -132,14 +132,17 @@ watch(() => [store.messages.length, store.loading] as const, ([len, loading]) =>
 
 function tryLoadMore() {
   const el = containerRef.value
-  if (!el || !props.chat) return
-  if (store.loading || !store.hasMore) return
+  if (!el || !props.chat || store.loading || !store.hasMore) {
+    autoLoadGuard = false
+    return
+  }
   // If content fits viewport (no scrollbar), load more
   if (el.scrollHeight <= el.clientHeight + 100) {
     store.loadMessages(props.chat.id).then(() => {
-      // Re-check after this load completes
       autoLoadGuard = false
     })
+  } else {
+    autoLoadGuard = false
   }
 }
 
@@ -149,6 +152,11 @@ async function restoreDetailPosition(msgId: number) {
   // Load more messages until target is found
   let idx = store.sortedMessages.findIndex(m => m.id === msgId)
   while (idx === -1 && store.hasMore && props.chat) {
+    if (store.loading) {
+      await new Promise(r => setTimeout(r, 100))
+      idx = store.sortedMessages.findIndex(m => m.id === msgId)
+      continue
+    }
     await store.loadMessages(props.chat.id)
     idx = store.sortedMessages.findIndex(m => m.id === msgId)
   }
@@ -157,7 +165,7 @@ async function restoreDetailPosition(msgId: number) {
       const el = containerRef.value?.querySelector(`[data-msg-id="${msgId}"]`)
       if (el) {
         el.scrollIntoView({ block: 'start' })
-        detailScrollRestored = true
+        // detailScrollRestored set below after async work
       }
     })
   }
@@ -170,6 +178,8 @@ watch(() => sortedMedia.value.length, (len) => {
   const hashParams = new URLSearchParams(window.location.hash.slice(1))
   const hashMsgId = hashParams.get('msg')
   if (hashMsgId) {
+    // Prevent re-entry before async work starts
+    detailScrollRestored = true
     restoreDetailPosition(parseInt(hashMsgId))
   } else {
     detailScrollRestored = true

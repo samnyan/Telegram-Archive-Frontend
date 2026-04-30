@@ -7,6 +7,7 @@ let _timezone = 'Europe/Madrid'
 
 export function setDefaultTimezone(tz: string) {
   _timezone = tz
+  DATE_FMT_CACHE.clear()
 }
 
 export function getDefaultTimezone() {

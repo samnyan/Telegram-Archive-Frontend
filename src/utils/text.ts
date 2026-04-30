@@ -9,12 +9,14 @@ export function escapeHtml(text: string): string {
 export function linkifyText(text: string | null | undefined): string {
   if (!text) return ''
   const escaped = escapeHtml(text)
-  const urlRegex = /(https?:\/\/[^\s<]+)/g
+  // Exclude quotes from URL match to prevent attribute breakout in href
+  const urlRegex = /(https?:\/\/[^\s<"']+)/g
   return escaped.replace(urlRegex, (match) => {
     const href = match
       .replace(/&amp;/g, '&')
       .replace(/&lt;/g, '%3C')
       .replace(/&gt;/g, '%3E')
+      .replace(/&quot;/g, '%22')
       .replace(/"/g, '%22')
       .replace(/'/g, '%27')
     return `<a href="${href}" target="_blank" rel="noopener noreferrer">${match}</a>`
