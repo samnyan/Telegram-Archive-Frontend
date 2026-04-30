@@ -439,6 +439,17 @@ onUnmounted(() => {
   if (lazyVideoObserver) lazyVideoObserver.disconnect()
 })
 
+// ── Handle re-mount: init render window when store already has messages ──
+onMounted(() => {
+  if (store.messages.length > 0 && renderEnd.value === 0) {
+    initRenderWindow()
+    nextTick(() => {
+      scrollToBottom()
+      setTimeout(() => { chatReady.value = true }, 50)
+    })
+  }
+})
+
 // ── Pinned message banner ────────────────────────────────
 const pinnedBanner = computed(() =>
   store.pinnedMessages.length > 0 ? store.pinnedMessages[store.currentPinnedIndex] : null
