@@ -2,11 +2,13 @@
 import { useAuthStore } from '../../stores/auth'
 import { useChatStore } from '../../stores/chat'
 import { useStatsStore } from '../../stores/stats'
+import { useAdminStore } from '../../stores/admin'
 import FolderTabs from './FolderTabs.vue'
 
 const auth = useAuthStore()
 const chat = useChatStore()
 const stats = useStatsStore()
+const admin = useAdminStore()
 
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 
@@ -40,7 +42,7 @@ function formatLastBackup(timeStr: string | null) {
     <!-- User bar row -->
     <div v-if="auth.authRequired && auth.isAuthenticated" class="flex items-center gap-2 px-3 py-1 border-b border-gray-700 -mx-4 -mt-4 mb-3">
       <span class="text-xs text-gray-400 truncate flex-1">{{ auth.currentUsername }}</span>
-      <button v-if="auth.isMaster" @click="() => {}" class="text-gray-400 hover:text-white p-1" title="Admin Settings">
+      <button v-if="auth.isMaster" @click="admin.openPanel()" class="text-gray-400 hover:text-white p-1" title="Admin Settings">
         <i class="fas fa-cog"></i>
       </button>
       <button @click="auth.performLogout()" class="text-gray-400 hover:text-red-400 p-1" title="Logout">

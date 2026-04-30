@@ -51,3 +51,4 @@ export async function fetchPinnedMessages(chatId: number): Promise<Message[]> {
 export async function exportChat(chatId: number): Promise<void> {
   window.open(`/api/chats/${chatId}/export`, '_blank')
 }
+

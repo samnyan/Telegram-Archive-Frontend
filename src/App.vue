@@ -1,28 +1,142 @@
 <script setup lang="ts">
-import { onMounted, watch, computed } from 'vue'
+import { onMounted, watch, computed, ref } from 'vue'
 import { useAuthStore } from './stores/auth'
-import { useChatStore } from './stores/chat'
+import { useChatStore, getChatName } from './stores/chat'
 import { useMessageStore } from './stores/messages'
 import { useStatsStore } from './stores/stats'
-import { setDefaultTimezone } from './utils/format'
+import { useAdminStore } from './stores/admin'
+import { setDefaultTimezone, getDefaultTimezone } from './utils/format'
+import { isLightboxMedia } from './utils/media'
+import * as messagesApi from './api/messages'
+import { useWebSocket } from './composables/useWebSocket'
+import { useNotifications } from './composables/useNotifications'
+import type { Message } from './types'
 import LoginForm from './components/auth/LoginForm.vue'
 import SidebarHeader from './components/chat/SidebarHeader.vue'
 import ChatList from './components/chat/ChatList.vue'
 import ChatHeader from './components/messages/ChatHeader.vue'
 import MessageList from './components/messages/MessageList.vue'
 import StatsPopup from './components/shared/StatsPopup.vue'
+import Lightbox from './components/shared/Lightbox.vue'
+import DatePickerModal from './components/shared/DatePickerModal.vue'
+import AdminPanel from './components/admin/AdminPanel.vue'
 
 const auth = useAuthStore()
 const chat = useChatStore()
 const messages = useMessageStore()
 const stats = useStatsStore()
+const admin = useAdminStore()
+const ws = useWebSocket()
+const notify = useNotifications()
 
-// Timezone from stats
+// ── WebSocket setup ───────────────────────────────────────
+ws.on('new_message', (data: any) => {
+  if (messages.selectedChatId === data.chat_id && data.message?.id != null) {
+    messages.handleNewMessage(data.message)
+  }
+  if (notify.permission.value === 'granted' && document.hidden) {
+    const chatName = chat.chats.find(c => c.id === data.chat_id)
+    notify.showDesktopNotification({
+      chat_name: getChatName(chatName ?? { title: 'New Message', first_name: null, last_name: null, username: null }),
+      body: data.message?.text?.substring(0, 100) || 'New message received',
+      chat_id: data.chat_id,
+    })
+  }
+})
+
+ws.on('edit', (data: any) => {
+  messages.handleEditMessage(data.message_id, data.new_text, data.edit_date)
+})
+
+ws.on('delete', (data: any) => {
+  messages.handleDeleteMessage(data.message_id)
+})
+
+ws.on('pin', (data: any) => {
+  if (messages.selectedChatId === data.chat_id) {
+    messages.loadPinnedMessages(data.chat_id)
+  }
+})
+
+// Subscribe/unsubscribe when selected chat changes
+watch(() => messages.selectedChatId, (newId, oldId) => {
+  if (newId) ws.subscribe(newId)
+  if (oldId) ws.unsubscribe(oldId)
+})
+
+// ── Lightbox ──────────────────────────────────────────────
+const lightboxOpen = ref(false)
+const lightboxMedia = ref<Message | null>(null)
+const lightboxIndex = ref(0)
+
+const mediaMessages = computed(() =>
+  messages.messages
+    .filter(m => isLightboxMedia(m))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+)
+
+function handleOpenLightbox(msg: Message, index: number) {
+  lightboxMedia.value = msg
+  lightboxIndex.value = index >= 0 ? index : mediaMessages.value.findIndex(m => m.id === msg.id)
+  lightboxOpen.value = true
+}
+
+function lightboxPrev() {
+  if (lightboxIndex.value > 0) {
+    lightboxIndex.value--
+    lightboxMedia.value = mediaMessages.value[lightboxIndex.value]
+  }
+}
+
+function lightboxNext() {
+  if (lightboxIndex.value < mediaMessages.value.length - 1) {
+    lightboxIndex.value++
+    lightboxMedia.value = mediaMessages.value[lightboxIndex.value]
+  }
+}
+
+function closeLightbox() {
+  lightboxOpen.value = false
+  lightboxMedia.value = null
+}
+
+// ── Date Picker ───────────────────────────────────────────
+const showDatePicker = ref(false)
+const jumpDatePickerRef = ref<InstanceType<typeof DatePickerModal> | null>(null)
+
+function handleOpenDatePicker(dateStr: string) {
+  // Convert to YYYY-MM-DD for the native date input
+  const d = new Date(dateStr.endsWith('Z') ? dateStr : dateStr + 'Z')
+  const formatted = d.toISOString().split('T')[0]
+  showDatePicker.value = true
+  setTimeout(() => jumpDatePickerRef.value?.open(formatted), 50)
+}
+
+async function handleJumpToDate(date: string) {
+  const chatId = chat.selectedChat?.id
+  if (!chatId) return
+
+  try {
+    const msg = await messagesApi.fetchMessageByDate(chatId, date, getDefaultTimezone())
+
+    // Check if already loaded
+    const exists = messages.messages.find(m => m.id === msg.id)
+    if (!exists) {
+      messages.messages.push(msg)
+    }
+    // Scroll to it will happen via the MessageList's scrollToMessage
+    showDatePicker.value = false
+  } catch {
+    alert('No messages found for this date')
+    showDatePicker.value = false
+  }
+}
+
+// ── Timezone ──────────────────────────────────────────────
 watch(() => stats.viewerTimezone, (tz) => {
   if (tz) setDefaultTimezone(tz)
 })
 
-// Selected chat computed from store
 const selectedChatForView = computed(() => chat.selectedChat)
 
 const currentTopicId = computed(() => {
@@ -46,6 +160,8 @@ onMounted(async () => {
       chat.loadFolders(),
       chat.loadArchivedCount(),
     ])
+    ws.connect()
+    notify.init()
   }
 })
 
@@ -58,7 +174,6 @@ function onLoginSuccess() {
   ])
 }
 
-// Handle chat selection from ChatList
 watch(
   () => messages.selectedChatId,
   (chatId) => {
@@ -75,10 +190,7 @@ function handleBackFromChat() {
   chat.selectedChat = null
   messages.reset()
   messages.setSelectedChatId(null)
-  // Pop navigation if needed
-  if (chat.currentNav.type === 'chat') {
-    chat.navigateBack()
-  }
+  if (chat.currentNav.type === 'chat') chat.navigateBack()
 }
 
 function handleExport() {
@@ -115,7 +227,6 @@ function handleMessageSearch(query: string) {
         'w-full md:w-1/4 md:min-w-[300px]': true,
       }"
     >
-      <!-- Error Banner -->
       <div v-if="chat.chatsError" class="px-3 py-2 bg-amber-900/80 border-b border-amber-700">
         <div class="flex items-center gap-2 text-amber-200 text-sm">
           <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -123,6 +234,34 @@ function handleMessageSearch(query: string) {
           </svg>
           <span>{{ chat.chatsError }}</span>
           <button @click="chat.loadChats()" class="ml-auto text-amber-300 hover:text-white text-xs underline">Retry</button>
+        </div>
+      </div>
+
+      <!-- Notification Permission Banner -->
+      <div
+        v-if="(notify.enabled.value || notify.pushEnabled.value) && notify.permission.value === 'default'"
+        class="px-3 py-2 bg-blue-900/80 border-b border-blue-700"
+      >
+        <div class="flex items-center gap-2 text-blue-200 text-sm">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+          </svg>
+          <span>Enable notifications for new messages</span>
+          <button @click="notify.requestPermission()" class="ml-auto px-2 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs rounded transition">Enable</button>
+        </div>
+      </div>
+
+      <!-- Notification Blocked Banner -->
+      <div
+        v-if="notify.notificationsBlocked.value && notify.pushSubscribed.value"
+        class="px-3 py-2 bg-amber-900/80 border-b border-amber-700"
+      >
+        <div class="flex items-center gap-2 text-amber-200 text-sm">
+          <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <span>Notifications blocked. Enable in browser settings.</span>
+          <button @click="notify.unsubscribeFromPush()" class="ml-auto px-2 py-1 bg-amber-700 hover:bg-amber-600 text-white text-xs rounded transition">Unsubscribe</button>
         </div>
       </div>
 
@@ -148,12 +287,13 @@ function handleMessageSearch(query: string) {
         @search="handleMessageSearch"
         @export="handleExport"
       />
-
       <MessageList
         v-if="selectedChatForView"
         :chat="selectedChatForView"
         :topicId="currentTopicId"
         :topicTitle="currentTopicTitle"
+        @openLightbox="handleOpenLightbox"
+        @openDatePicker="handleOpenDatePicker"
       />
     </main>
 
@@ -163,4 +303,27 @@ function handleMessageSearch(query: string) {
       @close="stats.statsPopupOpen = false"
     />
   </div>
+
+  <!-- Lightbox -->
+  <Lightbox
+    v-if="lightboxOpen && lightboxMedia"
+    :media="lightboxMedia"
+    :index="lightboxIndex"
+    :total="mediaMessages.length"
+    :noDownload="auth.noDownload"
+    @close="closeLightbox"
+    @prev="lightboxPrev"
+    @next="lightboxNext"
+  />
+
+  <!-- Date Picker -->
+  <DatePickerModal
+    v-if="showDatePicker"
+    ref="jumpDatePickerRef"
+    @close="showDatePicker = false"
+    @jump="handleJumpToDate"
+  />
+
+  <!-- Admin Panel -->
+  <AdminPanel v-if="admin.showPanel" />
 </template>
