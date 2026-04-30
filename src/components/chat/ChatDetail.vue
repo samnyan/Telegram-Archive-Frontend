@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import type { Chat, Message } from '../../types'
 import { useMessageStore } from '../../stores/messages'
 import { getChatName } from '../../stores/chat'
@@ -116,20 +116,36 @@ function handleDetailScroll() {
   })
 }
 
-onMounted(() => {
-  // Restore scroll position from hash
+let detailScrollRestored = false
+
+async function restoreDetailPosition(msgId: number) {
+  // Load more messages until target is found
+  let idx = store.sortedMessages.findIndex(m => m.id === msgId)
+  while (idx === -1 && store.hasMore && props.chat) {
+    await store.loadMessages(props.chat.id)
+    idx = store.sortedMessages.findIndex(m => m.id === msgId)
+  }
+  if (idx >= 0) {
+    nextTick(() => {
+      const el = containerRef.value?.querySelector(`[data-msg-id="${msgId}"]`)
+      if (el) {
+        el.scrollIntoView({ block: 'start' })
+        detailScrollRestored = true
+      }
+    })
+  }
+  return idx >= 0
+}
+
+// Restore scroll position after media grid renders
+watch(() => sortedMedia.value.length, (len) => {
+  if (len === 0 || detailScrollRestored) return
   const hashParams = new URLSearchParams(window.location.hash.slice(1))
   const hashMsgId = hashParams.get('msg')
   if (hashMsgId) {
-    const msgId = parseInt(hashMsgId)
-    // Check if this message is in our loaded set
-    const idx = store.sortedMessages.findIndex(m => m.id === msgId)
-    if (idx >= 0) {
-      nextTick(() => {
-        const el = containerRef.value?.querySelector(`[data-msg-id="${msgId}"]`)
-        if (el) el.scrollIntoView({ block: 'start' })
-      })
-    }
+    restoreDetailPosition(parseInt(hashMsgId))
+  } else {
+    detailScrollRestored = true
   }
 })
 

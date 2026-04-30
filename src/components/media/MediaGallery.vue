@@ -3,6 +3,7 @@ import { computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { Message } from '../../types'
 import { getMediaUrl } from '../../utils/media'
 import { isLightboxMedia } from '../../utils/media'
+import { useMessageStore } from '../../stores/messages'
 
 const props = defineProps<{
   messages: Message[]
@@ -12,6 +13,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   openLightbox: [msg: Message, index: number]
 }>()
+
+const store = useMessageStore()
 
 function thumbnailUrl(msg: Message): string {
   return getMediaUrl(msg)
@@ -130,6 +133,17 @@ watch(() => props.messages.length, () => nextTick(setupGalleryObserver))
           </div>
         </template>
       </div>
+    </div>
+
+    <!-- Loading more -->
+    <div v-if="store.loading" class="flex justify-center py-6">
+      <div class="loading-spinner" />
+      <span class="ml-2 text-sm text-tg-muted">Loading more...</span>
+    </div>
+
+    <!-- No more media -->
+    <div v-else-if="!store.hasMore && messages.length > 0" class="text-center py-6 text-tg-muted text-xs opacity-50">
+      No more {{ tab }} media
     </div>
   </div>
 </template>

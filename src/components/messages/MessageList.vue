@@ -254,8 +254,8 @@ function setupLazyVideoObserver() {
         if (video.classList.contains('gif-video')) {
           video.pause()
         }
-      }
-    })
+  }
+}, { immediate: true })
   }, { threshold: 0.1 })
 }
 
@@ -401,7 +401,7 @@ watch(() => props.chat?.id, (newId, oldId) => {
   } else if (oldId) {
     stopRefresh()
   }
-})
+}, { immediate: true })
 
 watch(() => store.messages.length, (len) => {
   if (len > 0 && renderEnd.value === 0) {
