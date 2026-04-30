@@ -156,58 +156,69 @@ const currentTopicTitle = computed(() => {
   return undefined
 })
 
-onMounted(async () => {
-  await auth.initialize()
-  if (auth.isAuthenticated) {
+// ── Load all data on authentication ───────────────────────
+// Uses a watcher on isAuthenticated (like the original code's performLogin
+// which loaded data immediately after setting isAuthenticated = true).
+// This avoids the race condition where emit('loginSuccess') fires after
+// the LoginForm is already unmounted by Vue's reactivity flush.
+const dataLoaded = ref(false)
+
+async function loadAppData() {
+  dataLoaded.value = true
+  try {
     await Promise.all([
       chat.loadChats(),
       stats.fetchStats(),
       chat.loadFolders(),
       chat.loadArchivedCount(),
     ])
-    ws.connect()
-    notify.init()
+  } catch { /* errors handled per-store */ }
+  ws.connect()
+  notify.init()
 
-    // Deep link from push notification (?chat=123&msg=456)
-    const urlParams = new URLSearchParams(window.location.search)
-    const chatIdParam = urlParams.get('chat')
-    const msgIdParam = urlParams.get('msg')
-    if (chatIdParam) {
-      const cid = parseInt(chatIdParam)
-      const targetChat = chat.chats.find(c => c.id === cid)
-      if (targetChat) {
-        chat.selectedChat = targetChat
-        messages.setSelectedChatId(cid)
-      }
-      window.history.replaceState({}, '', '/')
+  // Deep link from push notification (?chat=123&msg=456)
+  const urlParams = new URLSearchParams(window.location.search)
+  const chatIdParam = urlParams.get('chat')
+  const msgIdParam = urlParams.get('msg')
+  if (chatIdParam) {
+    const cid = parseInt(chatIdParam)
+    const targetChat = chat.chats.find(c => c.id === cid)
+    if (targetChat) {
+      chat.selectedChat = targetChat
+      messages.setSelectedChatId(cid)
     }
+    window.history.replaceState({}, '', '/')
+  }
 
-    // Listen for notification clicks when app is already open
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-      navigator.serviceWorker.addEventListener('message', async (event) => {
-        if (event.data?.type === 'NOTIFICATION_CLICK') {
-          const { chat_id, message_id } = event.data.data || {}
-          if (chat_id) {
-            const tc = chat.chats.find(c => c.id === chat_id)
-            if (tc) {
-              chat.selectedChat = tc
-              messages.setSelectedChatId(chat_id)
-            }
+  // Listen for notification clicks when app is already open
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.addEventListener('message', async (event) => {
+      if (event.data?.type === 'NOTIFICATION_CLICK') {
+        const { chat_id, message_id } = event.data.data || {}
+        if (chat_id) {
+          const tc = chat.chats.find(c => c.id === chat_id)
+          if (tc) {
+            chat.selectedChat = tc
+            messages.setSelectedChatId(chat_id)
           }
         }
-      })
-    }
+      }
+    })
+  }
+}
+
+watch(() => auth.isAuthenticated, (newVal) => {
+  if (newVal && !dataLoaded.value) {
+    loadAppData()
+  } else if (!newVal) {
+    dataLoaded.value = false
   }
 })
 
-function onLoginSuccess() {
-  Promise.all([
-    chat.loadChats(),
-    stats.fetchStats(),
-    chat.loadFolders(),
-    chat.loadArchivedCount(),
-  ])
-}
+onMounted(async () => {
+  await auth.initialize()
+  // loadAppData is triggered by the watcher above when isAuthenticated becomes true
+})
 
 watch(
   () => messages.selectedChatId,
@@ -249,7 +260,7 @@ function handleMessageSearch(query: string) {
     v-if="!auth.isAuthenticated"
     class="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-600 via-blue-700 to-blue-800"
   >
-    <LoginForm @loginSuccess="onLoginSuccess" />
+    <LoginForm />
   </div>
 
   <!-- Main App Shell -->

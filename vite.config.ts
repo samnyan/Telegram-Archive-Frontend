@@ -6,12 +6,12 @@ export default defineConfig({
   plugins: [vue(), tailwindcss()],
   server: {
     proxy: {
-      '/api': 'http://localhost:8080',
-      '/auth': 'http://localhost:8080',
-      '/media': 'http://localhost:8080',
-      '/ws': { target: 'ws://localhost:8080', ws: true },
-      '/static': 'http://localhost:8080',
-      '/sw.js': 'http://localhost:8080',
+      '/api': 'http://localhost:8000',
+      '/auth': 'http://localhost:8000',
+      '/media': 'http://localhost:8000',
+      '/ws': { target: 'ws://localhost:8000', ws: true },
+      '/static': 'http://localhost:8000',
+      '/sw.js': 'http://localhost:8000',
     },
   },
 })

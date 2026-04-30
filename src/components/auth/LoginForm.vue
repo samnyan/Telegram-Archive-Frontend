@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '../../stores/auth'
-import { useChatStore } from '../../stores/chat'
 
 const auth = useAuthStore()
-const chat = useChatStore()
-const emit = defineEmits<{ loginSuccess: [] }>()
 </script>
 
 <template>
@@ -32,7 +29,7 @@ const emit = defineEmits<{ loginSuccess: [] }>()
 
     <form
       v-if="auth.authRequired || auth.authCheckFailed"
-      @submit.prevent="auth.performLogin().then(() => { if (auth.isAuthenticated) emit('loginSuccess') })"
+      @submit.prevent="auth.performLogin()"
       class="space-y-5"
     >
       <!-- Login mode toggle -->
