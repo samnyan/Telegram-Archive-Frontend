@@ -139,6 +139,7 @@ function handleScroll(event: Event) {
 
 // ── URL hash persistence ───────────────────────────────────
 function updateUrlHash() {
+  if (suppressHashUpdate.value) return
   const container = messagesContainer.value
   if (!container || !props.chat) return
   // Find the message closest to the bottom of the viewport (where user reads)
@@ -165,6 +166,7 @@ function updateUrlHash() {
 
 const initialScrollDone = ref(false)
 const chatReady = ref(false)
+const suppressHashUpdate = ref(false)
 
 // ── 3-second polling auto-refresh ──────────────────────────
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -405,21 +407,27 @@ watch(() => store.messages.length, (len) => {
   if (len > 0 && renderEnd.value === 0) {
     initRenderWindow()
   }
-  if (len > 0 && !chatReady.value) {
-    nextTick(() => {
-      scrollToBottom()
-      // Slight delay ensures final scroll position before revealing
-      setTimeout(() => { chatReady.value = true }, 50)
-    })
-  }
   // Restore scroll position from URL hash on initial load
   if (len > 0 && !initialScrollDone.value) {
     initialScrollDone.value = true
     const hashParams = new URLSearchParams(window.location.hash.slice(1))
     const hashMsgId = hashParams.get('msg')
     if (hashMsgId) {
-      const msgId = parseInt(hashMsgId)
-      restorePosition(msgId)
+      // Position restore mode: suppress hash updates until restore completes
+      suppressHashUpdate.value = true
+      restorePosition(parseInt(hashMsgId)).then((found) => {
+        nextTick(() => {
+          chatReady.value = true
+          // Re-enable hash updates after restore scroll position settles
+          setTimeout(() => { suppressHashUpdate.value = false }, 300)
+        })
+      })
+    } else {
+      // No target message: scroll to bottom then reveal
+      nextTick(() => {
+        scrollToBottom()
+        setTimeout(() => { chatReady.value = true }, 50)
+      })
     }
   }
 })
