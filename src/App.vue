@@ -162,10 +162,14 @@ const showDetail = ref(false)
 const detailTab = ref<string>('video')
 
 function handleOpenDetail() {
-  showDetail.value = true
-  detailTab.value = 'video'
-  const hash = `#chat=${chat.selectedChat?.id}&detail=video`
-  window.history.replaceState({}, '', hash)
+  showDetail.value = !showDetail.value
+  if (showDetail.value) {
+    detailTab.value = 'video'
+    const hash = `#chat=${chat.selectedChat?.id}&detail=video`
+    window.history.replaceState({}, '', hash)
+  } else {
+    handleBackFromDetail()
+  }
 }
 
 function handleBackFromDetail() {
