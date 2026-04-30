@@ -98,6 +98,7 @@ export const useMessageStore = defineStore('messages', () => {
   }
 
   function reset() {
+    loading.value = false
     messages.value = []
     page.value = 0
     hasMore.value = true

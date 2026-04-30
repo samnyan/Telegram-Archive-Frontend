@@ -52,26 +52,30 @@ async function checkForNewMessages() {
     const latestIds = new Set(latestMessages.map(m => m.id))
     const existingIds = new Set(store.messages.map(m => m.id))
 
-    // New messages
+    // New messages (in server response but not in our view)
     const newMsgs = latestMessages.filter(m => !existingIds.has(m.id))
     if (newMsgs.length > 0) {
       store.messages.push(...newMsgs)
     }
 
-    // Deleted messages (only within our newest messages that overlap with server's response)
-    const sorted = [...store.messages].sort((a, b) =>
-      new Date(b.date).getTime() - new Date(a.date).getTime()
-    )
-    const ourNewest = sorted.slice(0, latestMessages.length)
-    const deletedIds = ourNewest.filter(m => !latestIds.has(m.id)).map(m => m.id)
+    // Deleted messages: only check overlap when we have enough messages
+    // to match the server's window. Sort only IDs+dates (lighter than full objects).
+    let deletedCount = 0
+    if (store.messages.length >= latestMessages.length) {
+      const sortedIds = [...store.messages.map(m => [m.id, m.date] as const)]
+        .sort((a, b) => new Date(b[1]).getTime() - new Date(a[1]).getTime())
+      const ourNewestIds = new Set(sortedIds.slice(0, latestMessages.length).map(([id]) => id))
+      const deletedIds = Array.from(ourNewestIds).filter(id => !latestIds.has(id))
 
-    if (deletedIds.length > 0) {
-      const set = new Set(deletedIds)
-      store.messages = store.messages.filter(m => !set.has(m.id))
+      if (deletedIds.length > 0) {
+        deletedCount = deletedIds.length
+        const set = new Set(deletedIds)
+        store.messages = store.messages.filter(m => !set.has(m.id))
+      }
     }
 
     // Auto-scroll if near bottom
-    if (newMsgs.length > 0 || deletedIds.length > 0) {
+    if (newMsgs.length > 0 || deletedCount > 0) {
       await nextTick()
       const container = messagesContainer.value
       if (container && container.scrollTop + container.clientHeight >= container.scrollHeight - 200) {
@@ -211,25 +215,23 @@ function scrollToMessage(msgId: number) {
 }
 
 // ── Load messages when chat changes ──────────────────────
-watch(() => props.chat?.id, (newId) => {
+// NOTE: Data loading (reset + loadMessages) is handled by App.vue's watcher on
+// selectedChatId. This watcher only handles UI lifecycle: polling, scroll, infinite scroll.
+watch(() => props.chat?.id, (newId, oldId) => {
+  const container = messagesContainer.value
+  if (container) {
+    container.scrollTop = 0 // scrollTop=0 means bottom (flex-col-reverse)
+  }
   if (newId) {
-    store.reset()
-    store.setSelectedChatId(newId)
-    store.loadMessages(newId, props.topicId)
-    store.loadPinnedMessages(newId)
-    store.loadChatStats(newId)
     nextTick(() => {
       scrollToBottom()
       infiniteScroll.setup()
     })
     startRefresh()
+  } else if (oldId) {
+    stopRefresh()
   }
-  const container = messagesContainer.value
-  if (container) {
-    // scrollTop=0 means bottom (flex-col-reverse)
-    container.scrollTop = 0
-  }
-}, { immediate: false })
+})
 
 // ── Pinned message banner ────────────────────────────────
 const pinnedBanner = computed(() =>
