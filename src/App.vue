@@ -20,6 +20,7 @@ import StatsPopup from './components/shared/StatsPopup.vue'
 import Lightbox from './components/shared/Lightbox.vue'
 import DatePickerModal from './components/shared/DatePickerModal.vue'
 import AdminPanel from './components/admin/AdminPanel.vue'
+import ChatDetail from './components/chat/ChatDetail.vue'
 
 const auth = useAuthStore()
 const chat = useChatStore()
@@ -156,6 +157,25 @@ const currentTopicTitle = computed(() => {
   return undefined
 })
 
+// ── Chat Detail View ────────────────────────────────────────
+const showDetail = ref(false)
+const detailTab = ref<string>('video')
+
+function handleOpenDetail() {
+  showDetail.value = true
+  detailTab.value = 'video'
+  const hash = `#chat=${chat.selectedChat?.id}&detail=video`
+  window.history.replaceState({}, '', hash)
+}
+
+function handleBackFromDetail() {
+  showDetail.value = false
+  if (messages.selectedChatId) {
+    const hash = `#chat=${messages.selectedChatId}`
+    window.history.replaceState({}, '', hash)
+  }
+}
+
 // ── Load all data on authentication ───────────────────────
 // Uses a watcher on isAuthenticated (like the original code's performLogin
 // which loaded data immediately after setting isAuthenticated = true).
@@ -191,6 +211,14 @@ async function loadAppData() {
       messages.setSelectedChatId(cid)
       // Don't clear hash — MessageList uses it for scroll restoration
     }
+  }
+
+  // Restore detail view state from hash
+  const hashParams2 = new URLSearchParams(window.location.hash.slice(1))
+  const detailParam = hashParams2.get('detail')
+  if (detailParam && chat.selectedChat) {
+    showDetail.value = true
+    detailTab.value = detailParam
   }
 
   // Listen for notification clicks when app is already open
@@ -239,6 +267,7 @@ function handleBackFromChat() {
   chat.selectedChat = null
   messages.reset()
   messages.setSelectedChatId(null)
+  showDetail.value = false
   if (chat.currentNav.type === 'chat') chat.navigateBack()
 }
 
@@ -327,6 +356,7 @@ function handleMessageSearch(query: string) {
       }"
     >
       <ChatHeader
+        v-if="selectedChatForView"
         :chat="selectedChatForView"
         :topicTitle="currentTopicTitle"
         :chatStats="messages.chatStats"
@@ -335,9 +365,20 @@ function handleMessageSearch(query: string) {
         @back="handleBackFromChat"
         @search="handleMessageSearch"
         @export="handleExport"
+        @openDetail="handleOpenDetail"
       />
+
+      <!-- Detail View (media gallery) -->
+      <ChatDetail
+        v-if="selectedChatForView && showDetail"
+        :chat="selectedChatForView"
+        @back="handleBackFromDetail"
+        @openLightbox="handleOpenLightbox"
+      />
+
+      <!-- Normal Message View -->
       <MessageList
-        v-if="selectedChatForView"
+        v-else-if="selectedChatForView"
         :chat="selectedChatForView"
         :topicId="currentTopicId"
         :topicTitle="currentTopicTitle"

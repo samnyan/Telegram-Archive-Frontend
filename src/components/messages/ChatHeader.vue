@@ -17,6 +17,7 @@ const emit = defineEmits<{
   back: []
   search: [query: string]
   export: []
+  openDetail: []
 }>()
 
 const searchQuery = ref('')
@@ -49,27 +50,29 @@ function avatarOf(chat: Chat) {
         </svg>
       </button>
 
-      <!-- Avatar -->
-      <div class="w-10 h-10 min-w-[2.5rem] aspect-square rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-white overflow-hidden shrink-0">
-        <img
-          v-if="chat.avatar_url" :src="chat.avatar_url" class="w-full h-full object-cover"
-          @error="(e: Event) => { (e.target as HTMLImageElement).style.display = 'none' }"
-        />
-        <svg
-          v-else-if="isDeletedChat(chat)" class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-        >
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14c2.21 0 4-1.343 4-3s-1.79-3-4-3-4 1.343-4 3 1.79 3 4 3z" />
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 21a7 7 0 0114 0" />
-        </svg>
-        <template v-else>{{ avatarOf(chat) }}</template>
-      </div>
+      <!-- Avatar + Name (clickable → opens detail) -->
+      <div @click="emit('openDetail')" class="flex items-center gap-2 sm:gap-3 cursor-pointer hover:opacity-80 transition min-w-0 flex-1">
+        <div class="w-10 h-10 min-w-[2.5rem] aspect-square rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-white overflow-hidden shrink-0">
+          <img
+            v-if="chat.avatar_url" :src="chat.avatar_url" class="w-full h-full object-cover"
+            @error="(e: Event) => { (e.target as HTMLImageElement).style.display = 'none' }"
+          />
+          <svg
+            v-else-if="isDeletedChat(chat)" class="w-6 h-6 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14c2.21 0 4-1.343 4-3s-1.79-3-4-3-4 1.343-4 3 1.79 3 4 3z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 21a7 7 0 0114 0" />
+          </svg>
+          <template v-else>{{ avatarOf(chat) }}</template>
+        </div>
 
-      <div class="min-w-0 flex-1 max-w-[180px] sm:max-w-xs">
-        <h2 class="font-bold text-base sm:text-lg truncate">{{ getChatName(chat) }}</h2>
-        <p class="text-xs text-tg-muted truncate">
-          <template v-if="topicTitle"># {{ topicTitle }}</template>
-          <template v-else>{{ chat.type }}</template>
-        </p>
+        <div class="min-w-0 flex-1 max-w-[180px] sm:max-w-xs">
+          <h2 class="font-bold text-base sm:text-lg truncate">{{ getChatName(chat) }}</h2>
+          <p class="text-xs text-tg-muted truncate">
+            <template v-if="topicTitle"># {{ topicTitle }}</template>
+            <template v-else>{{ chat.type }}</template>
+          </p>
+        </div>
       </div>
 
       <!-- Per-Chat Stats -->

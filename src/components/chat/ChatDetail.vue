@@ -1,0 +1,132 @@
+<script setup lang="ts">
+import { ref, computed } from 'vue'
+import type { Chat, Message } from '../../types'
+import { useMessageStore } from '../../stores/messages'
+import { getChatName } from '../../stores/chat'
+import { getInitials } from '../../utils/text'
+import { getMediaUrl } from '../../utils/media'
+import { isLightboxMedia } from '../../utils/media'
+import MediaGallery from '../media/MediaGallery.vue'
+
+const props = defineProps<{
+  chat: Chat
+}>()
+
+const emit = defineEmits<{
+  back: []
+  openLightbox: [msg: Message, index: number]
+}>()
+
+const store = useMessageStore()
+
+type MediaTab = 'video' | 'image' | 'voice' | 'files'
+const activeTab = ref<MediaTab>(
+  (new URLSearchParams(window.location.hash.slice(1)).get('detail') as MediaTab) || 'video'
+)
+
+const tabs: { key: MediaTab; label: string; icon: string }[] = [
+  { key: 'video', label: 'Video', icon: '▶' },
+  { key: 'image', label: 'Images', icon: '🖼' },
+  { key: 'voice', label: 'Voice', icon: '🎵' },
+  { key: 'files', label: 'Files', icon: '📄' },
+]
+
+// Filter messages by active tab
+const mediaMessages = computed(() => {
+  const all = store.messages.filter(m => m.media?.type)
+  switch (activeTab.value) {
+    case 'video':
+      return all.filter(m => m.media!.type === 'video' || m.media!.type === 'animation')
+    case 'image':
+      return all.filter(m => m.media!.type === 'photo')
+    case 'voice':
+      return all.filter(m => m.media!.type === 'voice' || m.media!.type === 'audio')
+    case 'files':
+      return all.filter(m => m.media!.type === 'document')
+  }
+})
+
+// Sort by date (newest first)
+const sortedMedia = computed(() =>
+  [...mediaMessages.value].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+)
+
+function selectTab(tab: MediaTab) {
+  activeTab.value = tab
+  // Update URL hash
+  const hash = `#chat=${props.chat.id}&detail=${tab}`
+  if (window.location.hash !== hash) {
+    window.history.replaceState({}, '', hash)
+  }
+}
+
+function onMediaClick(msg: Message, index: number) {
+  emit('openLightbox', msg, index)
+}
+
+function isDeletedChat(chat: Chat) {
+  return getChatName(chat) === 'Deleted Account'
+}
+
+function avatarOf(chat: Chat) {
+  return getInitials(getChatName(chat))
+}
+
+function formatMemberCount(count: number | null | undefined): string {
+  if (!count) return ''
+  return count >= 1000 ? `${(count / 1000).toFixed(1)}k members` : `${count} members`
+}
+</script>
+
+<template>
+  <div class="flex-1 flex flex-col min-h-0 bg-tg-bg overflow-y-auto">
+    <!-- Chat Info Header -->
+    <div class="px-4 py-6 flex flex-col items-center gap-3 border-b border-gray-700/50 text-center">
+      <!-- Avatar (larger) -->
+      <div class="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center font-bold text-white text-2xl overflow-hidden shrink-0 shadow-lg">
+        <img
+          v-if="chat.avatar_url" :src="chat.avatar_url" class="w-full h-full object-cover"
+          @error="(e: Event) => { (e.target as HTMLImageElement).style.display = 'none' }"
+        />
+        <svg v-else-if="isDeletedChat(chat)" class="w-10 h-10 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14c2.21 0 4-1.343 4-3s-1.79-3-4-3-4 1.343-4 3 1.79 3 4 3z" />
+        </svg>
+        <template v-else>{{ avatarOf(chat) }}</template>
+      </div>
+
+      <!-- Name & type -->
+      <div>
+        <h2 class="text-xl font-bold text-white">{{ getChatName(chat) }}</h2>
+        <p class="text-sm text-tg-muted mt-0.5">
+          {{ chat.type === 'channel' ? 'Channel' : chat.type === 'group' ? 'Group' : 'Private' }}
+          <span v-if="chat.participants_count">{{ formatMemberCount(chat.participants_count) }}</span>
+        </p>
+      </div>
+
+      <!-- Username -->
+      <p v-if="chat.username" class="text-xs text-blue-400">@{{ chat.username }}</p>
+    </div>
+
+    <!-- Media Type Tabs -->
+    <div class="flex border-b border-gray-700 bg-tg-sidebar sticky top-0 z-10">
+      <button
+        v-for="tab in tabs" :key="tab.key"
+        @click="selectTab(tab.key)"
+        class="flex-1 py-3 text-xs sm:text-sm font-medium transition-colors border-b-2"
+        :class="activeTab === tab.key
+          ? 'text-blue-400 border-blue-400'
+          : 'text-tg-muted border-transparent hover:text-gray-300'"
+      >
+        <span class="mr-1">{{ tab.icon }}</span>
+        {{ tab.label }}
+      </button>
+    </div>
+
+    <!-- Media Gallery -->
+    <MediaGallery
+      :messages="sortedMedia"
+      :tab="activeTab"
+      @openLightbox="onMediaClick"
+    />
+  </div>
+</template>
