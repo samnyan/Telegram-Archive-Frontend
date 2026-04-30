@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import type { Message, Chat } from '../../types'
 import { useMessageStore } from '../../stores/messages'
 import { useChatStore, getChatName } from '../../stores/chat'
@@ -35,7 +35,92 @@ const infiniteScroll = useInfiniteScroll(messagesContainer, loadMoreSentinel, ()
   }
 })
 
-// ── Album grouping ───────────────────────────────────────
+// ── 3-second polling auto-refresh ──────────────────────────
+let refreshTimer: ReturnType<typeof setInterval> | null = null
+let isRefreshing = false
+
+async function checkForNewMessages() {
+  if (!props.chat || isRefreshing || store.loading) return
+  isRefreshing = true
+  try {
+    const url = `/api/chats/${props.chat.id}/messages?limit=50&offset=0` +
+      (props.topicId ? `&topic_id=${props.topicId}` : '')
+    const res = await fetch(url, { credentials: 'include' })
+    if (!res.ok) return
+
+    const latestMessages: Message[] = await res.json()
+    const latestIds = new Set(latestMessages.map(m => m.id))
+    const existingIds = new Set(store.messages.map(m => m.id))
+
+    // New messages
+    const newMsgs = latestMessages.filter(m => !existingIds.has(m.id))
+    if (newMsgs.length > 0) {
+      store.messages.push(...newMsgs)
+    }
+
+    // Deleted messages (only within our newest messages that overlap with server's response)
+    const sorted = [...store.messages].sort((a, b) =>
+      new Date(b.date).getTime() - new Date(a.date).getTime()
+    )
+    const ourNewest = sorted.slice(0, latestMessages.length)
+    const deletedIds = ourNewest.filter(m => !latestIds.has(m.id)).map(m => m.id)
+
+    if (deletedIds.length > 0) {
+      const set = new Set(deletedIds)
+      store.messages = store.messages.filter(m => !set.has(m.id))
+    }
+
+    // Auto-scroll if near bottom
+    if (newMsgs.length > 0 || deletedIds.length > 0) {
+      await nextTick()
+      const container = messagesContainer.value
+      if (container && container.scrollTop + container.clientHeight >= container.scrollHeight - 200) {
+        scrollToBottom()
+      }
+    }
+  } catch { /* ignore */ }
+  finally { isRefreshing = false }
+}
+
+function startRefresh() {
+  stopRefresh()
+  refreshTimer = setInterval(checkForNewMessages, 3000)
+}
+
+function stopRefresh() {
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null }
+}
+
+onUnmounted(stopRefresh)
+
+// ── GIF Autoplay (IntersectionObserver) ────────────────────
+let gifObserver: IntersectionObserver | null = null
+
+function setupGifObserver() {
+  if (gifObserver) gifObserver.disconnect()
+  gifObserver = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      const video = entry.target as HTMLVideoElement
+      if (entry.isIntersecting) {
+        if (!video.src && video.dataset.src) video.src = video.dataset.src
+        video.play().catch(() => {})
+      } else {
+        video.pause()
+      }
+    })
+  }, { threshold: 0.1 })
+}
+
+function observeGifs() {
+  nextTick(() => {
+    if (!gifObserver) setupGifObserver()
+    document.querySelectorAll('.gif-video').forEach(v => gifObserver?.observe(v))
+  })
+}
+
+watch(() => store.messages.length, observeGifs, { deep: false })
+
+// ── Album grouping ────────────────────────────────────────
 function getGroupedId(msg: Message): string | null {
   const gid = msg.raw_data?.grouped_id
   return gid != null ? String(gid) : null
@@ -83,7 +168,6 @@ function openMedia(msg: Message) {
     window.open(`/media/${msg.media?.file_path?.split(/[/\\]/).slice(-2).join('/')}`, '_blank')
     return
   }
-  // Find index in sorted media messages
   const mediaMsgs = store.messages
     .filter(m => isLightboxMedia(m))
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
@@ -92,7 +176,7 @@ function openMedia(msg: Message) {
 }
 
 // ── Image/media error handling ────────────────────────────
-function handleImageError(event: Event, msg: Message) {
+function handleImageError(event: Event) {
   const img = event.target as HTMLImageElement
   img.onerror = null
   img.src = 'data:image/svg+xml,' + encodeURIComponent(
@@ -101,7 +185,7 @@ function handleImageError(event: Event, msg: Message) {
   img.style.cursor = 'default'
 }
 
-function handleMediaError(event: Event, msg: Message) {
+function handleMediaError(event: Event) {
   const media = event.target as HTMLElement
   const parent = media.parentElement
   if (parent) {
@@ -138,10 +222,16 @@ watch(() => props.chat?.id, (newId) => {
       scrollToBottom()
       infiniteScroll.setup()
     })
+    startRefresh()
+  }
+  const container = messagesContainer.value
+  if (container) {
+    // scrollTop=0 means bottom (flex-col-reverse)
+    container.scrollTop = 0
   }
 }, { immediate: false })
 
-// ── Load pinned messages when chat changes ────────────────
+// ── Pinned message banner ────────────────────────────────
 const pinnedBanner = computed(() =>
   store.pinnedMessages.length > 0 ? store.pinnedMessages[store.currentPinnedIndex] : null
 )
@@ -154,10 +244,31 @@ function handlePinnedClick() {
     }
   }
 }
+
+function closePinnedView() {
+  store.showPinnedOnly = false
+}
 </script>
 
 <template>
   <div class="flex-1 relative min-h-0">
+    <!-- Pinned Messages View Header (shown when in pinned-only mode) -->
+    <div v-if="store.showPinnedOnly"
+      class="px-4 py-3 bg-tg-sidebar border-b border-gray-700 flex items-center gap-3"
+    >
+      <button @click="closePinnedView"
+        class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10 text-gray-300 transition"
+      >
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+      </button>
+      <div class="flex-1">
+        <div class="text-base font-semibold text-white">Pinned Messages</div>
+        <div class="text-xs text-tg-muted">{{ store.pinnedMessages.length }} messages</div>
+      </div>
+    </div>
+
     <div
       ref="messagesContainer"
       class="h-full overflow-y-auto p-4 flex flex-col-reverse gap-1 messages-scroll"
@@ -202,7 +313,7 @@ function handlePinnedClick() {
       </div>
     </div>
 
-    <!-- Pinned Message Banner -->
+    <!-- Pinned Message Banner (not in pinned-only view) -->
     <div
       v-if="pinnedBanner && !store.showPinnedOnly"
       class="px-4 py-2 bg-tg-sidebar/80 backdrop-blur-sm border-b border-gray-700 flex items-center gap-3"
@@ -225,7 +336,7 @@ function handlePinnedClick() {
       </div>
       <div class="flex items-center gap-2">
         <span class="text-xs text-tg-muted">{{ new Date(pinnedBanner.date).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) }}</span>
-        <button @click="store.showPinnedOnly = true" class="w-6 h-6 flex items-center justify-center rounded-full bg-blue-500/20 hover:bg-blue-500/40 text-blue-400 transition">
+        <button @click.stop="store.showPinnedOnly = true" class="w-6 h-6 flex items-center justify-center rounded-full bg-blue-500/20 hover:bg-blue-500/40 text-blue-400 transition">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
           </svg>

@@ -64,6 +64,11 @@ watch(() => messages.selectedChatId, (newId, oldId) => {
   if (oldId) ws.unsubscribe(oldId)
 })
 
+// Re-subscribe to current chat on WS reconnect
+ws.onConnect(() => {
+  if (messages.selectedChatId) ws.subscribe(messages.selectedChatId)
+})
+
 // ── Lightbox ──────────────────────────────────────────────
 const lightboxOpen = ref(false)
 const lightboxMedia = ref<Message | null>(null)
@@ -162,6 +167,36 @@ onMounted(async () => {
     ])
     ws.connect()
     notify.init()
+
+    // Deep link from push notification (?chat=123&msg=456)
+    const urlParams = new URLSearchParams(window.location.search)
+    const chatIdParam = urlParams.get('chat')
+    const msgIdParam = urlParams.get('msg')
+    if (chatIdParam) {
+      const cid = parseInt(chatIdParam)
+      const targetChat = chat.chats.find(c => c.id === cid)
+      if (targetChat) {
+        chat.selectedChat = targetChat
+        messages.setSelectedChatId(cid)
+      }
+      window.history.replaceState({}, '', '/')
+    }
+
+    // Listen for notification clicks when app is already open
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.addEventListener('message', async (event) => {
+        if (event.data?.type === 'NOTIFICATION_CLICK') {
+          const { chat_id, message_id } = event.data.data || {}
+          if (chat_id) {
+            const tc = chat.chats.find(c => c.id === chat_id)
+            if (tc) {
+              chat.selectedChat = tc
+              messages.setSelectedChatId(chat_id)
+            }
+          }
+        }
+      })
+    }
   }
 })
 

@@ -47,6 +47,9 @@ export function useNotifications() {
             await syncToServer(pushSubscription)
             if (permission.value === 'denied') {
               notificationsBlocked.value = true
+            } else if (permission.value === 'granted' && localStorage.getItem('push_enabled') === 'true') {
+              // Subscription expired/lost but permission still granted and user previously opted in
+              await subscribeToPush()
             }
           }
         }

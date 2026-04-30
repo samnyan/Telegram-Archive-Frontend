@@ -7,6 +7,11 @@ export function useWebSocket() {
   let ws: WebSocket | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   const handlers = new Map<string, WsMessageHandler>()
+  let onConnectCallback: (() => void) | null = null
+
+  function onConnect(cb: () => void) {
+    onConnectCallback = cb
+  }
 
   function connect() {
     if (ws) ws.close()
@@ -19,6 +24,7 @@ export function useWebSocket() {
 
       ws.onopen = () => {
         connected.value = true
+        if (onConnectCallback) onConnectCallback()
       }
 
       ws.onmessage = (event) => {
@@ -72,5 +78,5 @@ export function useWebSocket() {
 
   onUnmounted(disconnect)
 
-  return { connected, connect, subscribe, unsubscribe, on, disconnect }
+  return { connected, connect, subscribe, unsubscribe, on, onConnect, disconnect }
 }
