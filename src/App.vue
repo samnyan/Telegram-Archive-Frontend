@@ -159,6 +159,11 @@ const currentTopicTitle = computed(() => {
 
 // ── Chat Detail View ────────────────────────────────────────
 const showDetail = ref(false)
+const sidebarOpen = ref(true)
+
+function toggleSidebar() {
+  sidebarOpen.value = !sidebarOpen.value
+}
 
 function handleOpenDetail() {
   showDetail.value = !showDetail.value
@@ -307,10 +312,14 @@ function handleMessageSearch(query: string) {
   <div v-else class="flex w-full h-full bg-tg-bg">
     <!-- Sidebar -->
     <aside
-      class="bg-tg-sidebar flex flex-col border-r border-gray-700"
+      class="bg-tg-sidebar flex-col border-r border-gray-700"
       :class="{
-        'hidden md:flex': messages.selectedChatId,
-        'w-full md:w-1/4 md:min-w-[300px]': true,
+        // No chat selected: always visible, full width on mobile
+        'flex w-full md:w-1/4 md:min-w-[300px]': !messages.selectedChatId,
+        // Chat selected + sidebar open: hidden on mobile, visible on desktop
+        'hidden md:flex md:w-1/4 md:min-w-[300px]': messages.selectedChatId && sidebarOpen,
+        // Chat selected + sidebar closed: always hidden
+        'hidden': messages.selectedChatId && !sidebarOpen,
       }"
     >
       <div v-if="chat.chatsError" class="px-3 py-2 bg-amber-900/80 border-b border-amber-700">
@@ -376,6 +385,7 @@ function handleMessageSearch(query: string) {
         @search="handleMessageSearch"
         @export="handleExport"
         @openDetail="handleOpenDetail"
+        @toggleSidebar="toggleSidebar"
       />
 
       <!-- Detail View (media gallery) -->

@@ -137,11 +137,25 @@ function handleScroll(event: Event) {
   })
 }
 
-// ── URL hash persistence ───────────────────────────────────
+// ── URL hash persistence (debounced) ──────────────────────
+let hashUpdateTimer: ReturnType<typeof setTimeout> | null = null
+let lastHashUpdate = 0
+
 function updateUrlHash() {
   if (suppressHashUpdate.value) return
   const container = messagesContainer.value
   if (!container || !props.chat) return
+
+  // Throttle: at most every 500ms during scrolling
+  const now = Date.now()
+  if (now - lastHashUpdate < 500) {
+    // Debounce: schedule one final update after scrolling stops
+    if (hashUpdateTimer) clearTimeout(hashUpdateTimer)
+    hashUpdateTimer = setTimeout(updateUrlHash, 300)
+    return
+  }
+  lastHashUpdate = now
+
   // Find the message closest to the bottom of the viewport (where user reads)
   const bubbles = container.querySelectorAll('.message-bubble')
   let bottomMsgId: number | null = null
