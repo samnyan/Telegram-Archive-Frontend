@@ -80,6 +80,15 @@ function formatMemberCount(count: number | null | undefined): string {
 const containerRef = ref<HTMLElement | null>(null)
 let scrollRAF = 0
 
+function tryLoadMore() {
+  const el = containerRef.value
+  if (!el || !props.chat) return
+  // If content fits viewport (no scrollbar), auto-load more
+  if (el.scrollHeight <= el.clientHeight + 100 && store.hasMore && !store.loading) {
+    store.loadMessages(props.chat.id)
+  }
+}
+
 function handleDetailScroll() {
   if (scrollRAF) return
   scrollRAF = requestAnimationFrame(() => {
@@ -115,6 +124,13 @@ function handleDetailScroll() {
     }
   })
 }
+
+// Auto-load more when content fits viewport (e.g., large screen, few media)
+watch(() => [store.messages.length, store.loading] as const, ([len, loading]) => {
+  if (len > 0 && !loading) {
+    nextTick(() => tryLoadMore())
+  }
+})
 
 let detailScrollRestored = false
 

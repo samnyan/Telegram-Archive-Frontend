@@ -160,6 +160,7 @@ const currentTopicTitle = computed(() => {
 // ── Chat Detail View ────────────────────────────────────────
 const showDetail = ref(false)
 const detailTab = ref<string>('video')
+const messageViewKey = ref(0)
 
 function handleOpenDetail() {
   showDetail.value = !showDetail.value
@@ -174,6 +175,7 @@ function handleOpenDetail() {
 
 function handleBackFromDetail() {
   showDetail.value = false
+  messageViewKey.value++
   if (messages.selectedChatId) {
     const hash = `#chat=${messages.selectedChatId}`
     window.history.replaceState({}, '', hash)
@@ -386,6 +388,7 @@ function handleMessageSearch(query: string) {
       <!-- Normal Message View -->
       <MessageList
         v-else-if="selectedChatForView"
+        :key="`${selectedChatForView.id}-${messageViewKey}`"
         :chat="selectedChatForView"
         :topicId="currentTopicId"
         :topicTitle="currentTopicTitle"
