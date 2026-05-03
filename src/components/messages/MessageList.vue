@@ -547,14 +547,13 @@ function closePinnedView() {
 
       <!-- Messages loop -->
       <template v-for="(msg, index) in visibleMessages" :key="msg.id">
-        <div class="message-bubble" :data-msg-id="msg.id">
+        <div v-if="!isHiddenAlbumMsg(msg, index + renderStart)" class="message-bubble" :data-msg-id="msg.id">
           <MessageBubble
             :message="msg"
             :index="index + renderStart"
             :chat="chat"
             :album="getAlbumFor(msg)"
             :isFirstInAlbum="isFirstInAlbum(msg, index + renderStart)"
-            :isHiddenAlbum="isHiddenAlbumMsg(msg, index + renderStart)"
             :showDateSep="showDateSep(index + renderStart)"
             :showSender="showSenderName(index + renderStart)"
             :noDownload="auth.noDownload"
