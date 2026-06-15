@@ -2,6 +2,7 @@ import type { Message } from '../types'
 
 /** Build media serve URL from stored file_path */
 export function getMediaUrl(msg: Message): string {
+  if (msg.media?.media_url) return msg.media.media_url
   const path = msg.media?.file_path
   if (!path) return ''
   const parts = path.split(/[/\\]/)

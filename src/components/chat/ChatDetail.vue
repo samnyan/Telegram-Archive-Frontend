@@ -1,11 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
-import type { Chat, Message } from '../../types'
-import { useMessageStore } from '../../stores/messages'
+import { ref, computed, onUnmounted, nextTick, watch } from 'vue'
+import type { Chat, MediaGalleryItem, Message } from '../../types'
+import * as mediaApi from '../../api/media'
 import { getChatName } from '../../stores/chat'
 import { getInitials } from '../../utils/text'
-import { getMediaUrl } from '../../utils/media'
-import { isLightboxMedia } from '../../utils/media'
 import MediaGallery from '../media/MediaGallery.vue'
 
 const props = defineProps<{
@@ -14,45 +12,38 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   back: []
-  openLightbox: [msg: Message, index: number]
+  openLightbox: [msg: Message, index: number, list?: Message[]]
 }>()
-
-const store = useMessageStore()
 
 type MediaTab = 'video' | 'image' | 'voice' | 'files'
 const validTabs: MediaTab[] = ['video', 'image', 'voice', 'files']
 const hashTab = new URLSearchParams(window.location.hash.slice(1)).get('detail') as MediaTab
 const activeTab = ref<MediaTab>(validTabs.includes(hashTab) ? hashTab : 'video')
 
-const tabs: { key: MediaTab; label: string; icon: string }[] = [
-  { key: 'video', label: 'Video', icon: '▶' },
-  { key: 'image', label: 'Images', icon: '🖼' },
-  { key: 'voice', label: 'Voice', icon: '🎵' },
-  { key: 'files', label: 'Files', icon: '📄' },
+const tabs: { key: MediaTab; label: string; icon: string; types: string[] }[] = [
+  { key: 'video', label: 'Video', icon: '▶', types: ['video', 'animation'] },
+  { key: 'image', label: 'Images', icon: '🖼', types: ['photo'] },
+  { key: 'voice', label: 'Voice', icon: '🎵', types: ['voice', 'audio'] },
+  { key: 'files', label: 'Files', icon: '📄', types: ['document'] },
 ]
 
-// Filter messages by active tab
-const mediaMessages = computed(() => {
-  const all = store.messages.filter(m => m.media?.type)
-  switch (activeTab.value) {
-    case 'video':
-      return all.filter(m => m.media!.type === 'video' || m.media!.type === 'animation')
-    case 'image':
-      return all.filter(m => m.media!.type === 'photo')
-    case 'voice':
-      return all.filter(m => m.media!.type === 'voice' || m.media!.type === 'audio')
-    case 'files':
-      return all.filter(m => m.media!.type === 'document')
-  }
+const galleryItems = ref<MediaGalleryItem[]>([])
+const galleryLoading = ref(false)
+const galleryHasMore = ref(true)
+const galleryCounts = ref<Record<MediaTab, number>>({
+  video: 0,
+  image: 0,
+  voice: 0,
+  files: 0,
 })
 
-// Sort by date (newest first)
-const sortedMedia = computed(() =>
-  [...mediaMessages.value].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-)
+const activeTypes = computed(() => tabs.find(tab => tab.key === activeTab.value)?.types ?? [])
 
 function selectTab(tab: MediaTab) {
+  if (activeTab.value === tab) return
   activeTab.value = tab
+  resetGallery()
+  loadGallery()
   // Update URL hash
   const hash = `#chat=${props.chat.id}&detail=${tab}`
   if (window.location.hash !== hash) {
@@ -60,8 +51,44 @@ function selectTab(tab: MediaTab) {
   }
 }
 
-function onMediaClick(msg: Message, index: number) {
-  emit('openLightbox', msg, index)
+function mediaItemToMessage(item: MediaGalleryItem): Message {
+  return {
+    id: item.message_id,
+    chat_id: item.chat_id,
+    date: item.message_date || '',
+    text: '',
+    edit_date: null,
+    is_outgoing: null,
+    sender_id: null,
+    first_name: item.sender_name,
+    last_name: null,
+    username: null,
+    reply_to_msg_id: null,
+    reply_to_text: null,
+    forward_from_id: null,
+    media: {
+      type: item.type,
+      file_path: item.file_path ?? null,
+      file_name: item.file_name,
+      mime_type: item.mime_type,
+      media_url: item.media_url ?? null,
+      thumb_url: item.thumb_url,
+    },
+    raw_data: null,
+    reactions: null,
+  }
+}
+
+function lightboxMessages(): Message[] {
+  return galleryItems.value
+    .filter(item => ['photo', 'video', 'animation'].includes(item.type) && (item.media_url || item.file_path))
+    .map(mediaItemToMessage)
+}
+
+function onMediaClick(item: MediaGalleryItem) {
+  const list = lightboxMessages()
+  const msgIndex = list.findIndex(msg => msg.id === item.message_id)
+  if (msgIndex >= 0) emit('openLightbox', list[msgIndex], msgIndex, list)
 }
 
 function isDeletedChat(chat: Chat) {
@@ -79,6 +106,50 @@ function formatMemberCount(count: number | null | undefined): string {
 
 const containerRef = ref<HTMLElement | null>(null)
 let scrollRAF = 0
+let galleryVersion = 0
+
+function resetGallery() {
+  galleryItems.value = []
+  galleryLoading.value = false
+  galleryHasMore.value = true
+  detailScrollRestored = false
+  galleryVersion++
+}
+
+async function loadGallery(append = false) {
+  if (galleryLoading.value || (!galleryHasMore.value && append)) return
+
+  const myVersion = galleryVersion
+  galleryLoading.value = true
+  try {
+    const lastItem = append ? galleryItems.value[galleryItems.value.length - 1] : null
+    const result = await mediaApi.fetchChatMedia({
+      chatId: props.chat.id,
+      types: activeTypes.value,
+      limit: 50,
+      beforeId: lastItem?.id,
+    })
+    if (galleryVersion !== myVersion) return
+    galleryItems.value = append ? [...galleryItems.value, ...result.items] : result.items
+    galleryHasMore.value = result.has_more
+  } finally {
+    if (galleryVersion === myVersion) galleryLoading.value = false
+  }
+}
+
+async function loadGalleryCounts() {
+  try {
+    const counts = await mediaApi.fetchChatMediaCounts(props.chat.id)
+    galleryCounts.value = {
+      video: (counts.video || 0) + (counts.animation || 0),
+      image: counts.photo || 0,
+      voice: (counts.voice || 0) + (counts.audio || 0),
+      files: counts.document || 0,
+    }
+  } catch {
+    galleryCounts.value = { video: 0, image: 0, voice: 0, files: 0 }
+  }
+}
 
 function handleDetailScroll() {
   if (scrollRAF) return
@@ -87,12 +158,12 @@ function handleDetailScroll() {
     const el = containerRef.value
     if (!el) return
 
-    // Infinite scroll: load more messages when near bottom
+    // Infinite scroll: load more media when near bottom
     const { scrollTop, scrollHeight, clientHeight } = el
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight
-    if (distanceFromBottom < 500 && !autoLoadGuard && store.hasMore && !store.loading && props.chat) {
+    if (distanceFromBottom < 500 && !autoLoadGuard && galleryHasMore.value && !galleryLoading.value) {
       autoLoadGuard = true
-      store.loadMessages(props.chat.id).then(() => {
+      loadGallery(true).then(() => {
         autoLoadGuard = false
       })
     }
@@ -119,11 +190,9 @@ function handleDetailScroll() {
   })
 }
 
-// Auto-load more when content fits viewport (e.g., large screen, few media)
-// Only runs once after mount or after a manual load, NOT in a tight loop
 let autoLoadGuard = false
 
-watch(() => [store.messages.length, store.loading] as const, ([len, loading]) => {
+watch(() => [galleryItems.value.length, galleryLoading.value] as const, ([len, loading]) => {
   if (len > 0 && !loading && !autoLoadGuard) {
     autoLoadGuard = true
     nextTick(() => tryLoadMore())
@@ -132,13 +201,13 @@ watch(() => [store.messages.length, store.loading] as const, ([len, loading]) =>
 
 function tryLoadMore() {
   const el = containerRef.value
-  if (!el || !props.chat || store.loading || !store.hasMore) {
+  if (!el || galleryLoading.value || !galleryHasMore.value) {
     autoLoadGuard = false
     return
   }
   // If content fits viewport (no scrollbar), load more
   if (el.scrollHeight <= el.clientHeight + 100) {
-    store.loadMessages(props.chat.id).then(() => {
+    loadGallery(true).then(() => {
       autoLoadGuard = false
     })
   } else {
@@ -149,16 +218,15 @@ function tryLoadMore() {
 let detailScrollRestored = false
 
 async function restoreDetailPosition(msgId: number) {
-  // Load more messages until target is found
-  let idx = store.sortedMessages.findIndex(m => m.id === msgId)
-  while (idx === -1 && store.hasMore && props.chat) {
-    if (store.loading) {
+  let idx = galleryItems.value.findIndex(item => item.message_id === msgId)
+  while (idx === -1 && galleryHasMore.value) {
+    if (galleryLoading.value) {
       await new Promise(r => setTimeout(r, 100))
-      idx = store.sortedMessages.findIndex(m => m.id === msgId)
+      idx = galleryItems.value.findIndex(item => item.message_id === msgId)
       continue
     }
-    await store.loadMessages(props.chat.id)
-    idx = store.sortedMessages.findIndex(m => m.id === msgId)
+    await loadGallery(true)
+    idx = galleryItems.value.findIndex(item => item.message_id === msgId)
   }
   if (idx >= 0) {
     nextTick(() => {
@@ -173,7 +241,7 @@ async function restoreDetailPosition(msgId: number) {
 }
 
 // Restore scroll position after media grid renders
-watch(() => sortedMedia.value.length, (len) => {
+watch(() => galleryItems.value.length, (len) => {
   if (len === 0 || detailScrollRestored) return
   const hashParams = new URLSearchParams(window.location.hash.slice(1))
   const hashMsgId = hashParams.get('msg')
@@ -185,6 +253,12 @@ watch(() => sortedMedia.value.length, (len) => {
     detailScrollRestored = true
   }
 })
+
+watch(() => props.chat.id, () => {
+  resetGallery()
+  loadGallery()
+  loadGalleryCounts()
+}, { immediate: true })
 
 onUnmounted(() => { if (scrollRAF) cancelAnimationFrame(scrollRAF) })
 </script>
@@ -230,13 +304,16 @@ onUnmounted(() => { if (scrollRAF) cancelAnimationFrame(scrollRAF) })
       >
         <span class="mr-1">{{ tab.icon }}</span>
         {{ tab.label }}
+        <span v-if="galleryCounts[tab.key]" class="ml-1 text-[11px] opacity-70">({{ galleryCounts[tab.key] }})</span>
       </button>
     </div>
 
     <!-- Media Gallery -->
     <MediaGallery
-      :messages="sortedMedia"
+      :items="galleryItems"
       :tab="activeTab"
+      :loading="galleryLoading"
+      :hasMore="galleryHasMore"
       @openLightbox="onMediaClick"
     />
   </div>

@@ -18,6 +18,8 @@ export interface MediaRecord {
   file_path: string | null
   file_name: string | null
   mime_type: string | null
+  media_url?: string | null
+  thumb_url?: string | null
 }
 
 export interface PollResult {
@@ -73,6 +75,32 @@ export interface Message {
   raw_data: RawData | null
   reactions: Reaction[] | null
 }
+
+// ── Media Gallery ─────────────────────────────────────────
+export interface MediaGalleryItem {
+  id: string
+  message_id: number
+  chat_id: number
+  type: string
+  file_path?: string | null
+  file_name: string | null
+  file_size: number | null
+  mime_type: string | null
+  width: number | null
+  height: number | null
+  duration: number | null
+  message_date: string | null
+  sender_name: string | null
+  thumb_url: string | null
+  media_url?: string | null
+}
+
+export interface MediaGalleryResponse {
+  items: MediaGalleryItem[]
+  has_more: boolean
+}
+
+export type MediaCounts = Record<string, number>
 
 // ── Folder ─────────────────────────────────────────────────
 export interface Folder {

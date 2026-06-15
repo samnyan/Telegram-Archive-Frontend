@@ -74,6 +74,7 @@ ws.onConnect(() => {
 const lightboxOpen = ref(false)
 const lightboxMedia = ref<Message | null>(null)
 const lightboxIndex = ref(0)
+const lightboxList = ref<Message[] | null>(null)
 
 const mediaMessages = computed(() =>
   messages.messages
@@ -81,29 +82,33 @@ const mediaMessages = computed(() =>
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
 )
 
-function handleOpenLightbox(msg: Message, index: number) {
+const activeLightboxList = computed(() => lightboxList.value || mediaMessages.value)
+
+function handleOpenLightbox(msg: Message, index: number, list?: Message[]) {
+  lightboxList.value = list || null
   lightboxMedia.value = msg
-  lightboxIndex.value = index >= 0 ? index : mediaMessages.value.findIndex(m => m.id === msg.id)
+  lightboxIndex.value = index >= 0 ? index : activeLightboxList.value.findIndex(m => m.id === msg.id)
   lightboxOpen.value = true
 }
 
 function lightboxPrev() {
   if (lightboxIndex.value > 0) {
     lightboxIndex.value--
-    lightboxMedia.value = mediaMessages.value[lightboxIndex.value]
+    lightboxMedia.value = activeLightboxList.value[lightboxIndex.value]
   }
 }
 
 function lightboxNext() {
-  if (lightboxIndex.value < mediaMessages.value.length - 1) {
+  if (lightboxIndex.value < activeLightboxList.value.length - 1) {
     lightboxIndex.value++
-    lightboxMedia.value = mediaMessages.value[lightboxIndex.value]
+    lightboxMedia.value = activeLightboxList.value[lightboxIndex.value]
   }
 }
 
 function closeLightbox() {
   lightboxOpen.value = false
   lightboxMedia.value = null
+  lightboxList.value = null
 }
 
 // ── Date Picker ───────────────────────────────────────────
@@ -419,7 +424,7 @@ function handleMessageSearch(query: string) {
     v-if="lightboxOpen && lightboxMedia"
     :media="lightboxMedia"
     :index="lightboxIndex"
-    :total="mediaMessages.length"
+    :total="activeLightboxList.length"
     :noDownload="auth.noDownload"
     @close="closeLightbox"
     @prev="lightboxPrev"
